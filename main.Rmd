@@ -11,12 +11,42 @@ knitr::opts_chunk$set(echo = TRUE)
 Importing dataset and libraries
 ```{r df_import, include=FALSE}
 
-df= read.table("/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",") 
+df= read.table("/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
 library(gridExtra)
 ```
+
+Find for columns with missing values
+
+
+
+
+```{r unique values}
+
+# Crea una copia del dataframe convertendo tutte le colonne in stringhe
+df_copy <- lapply(df, as.character)
+
+# Creiamo una funzione per contare "NA", "" o "0" in ogni colonna della copia
+count_na_empty_or_zero_strings <- function(column) {
+  # Sostituiamo i veri NA con stringhe vuote per una conta coerente
+  column[is.na(column)] <- ""
+  sum(column == "" | column == "0", na.rm = TRUE)
+}
+
+# Applicare la funzione a tutte le colonne della copia e stampare i risultati
+na_empty_or_zero_counts <- sapply(df_copy, count_na_empty_or_zero_strings)
+
+# Stampa il numero di "NA", "" o "0" per ogni colonna della copia
+print(na_empty_or_zero_counts)
+```
+We see that there are 3 columns with missing values:
+-Item_Weight
+-Item_Visibility
+-Outlet_Size
+
+
 
 
 Firstly, we are going to fix all features in our dataset, we will start from the feature "Item_Fat_Content".
@@ -162,6 +192,41 @@ names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
 # Display the result
 print(zero_visibility_counts)
 ```
+
+Now we want to fill also the empty rows of the column "Item_Weight". 
+The first idea was to use the general mean of "Item_Weight", but since we have also the category of each product, we can compute the mean of every product category.
+At the end, we will check for every record with missing "Item_Weight" and we will do a double check:
+1. if there is another item with the same id and missing weight, they will have for sure the same weight.
+2. We will put in item_weight, the mean of the weights of the products of the same category.
+
+
+```{r handling missing item_weight}
+
+# Calcolare la media del peso per ogni categoria di prodotto
+average_weight_per_type <- aggregate(Item_Weight ~ Item_Type, data = df, mean, na.rm = TRUE)
+
+# Funzione per riempire i pesi mancanti
+fill_missing_weights <- function(item_id, item_type) {
+  # Controlla se esiste un valore non NA per lo stesso Item_Identifier
+  if (any(!is.na(df$Item_Weight[df$Item_Identifier == item_id]))) {
+    return(df$Item_Weight[df$Item_Identifier == item_id & !is.na(df$Item_Weight)][1])
+  } else {
+    # Altrimenti usa la media del Item_Type corrispondente
+    return(average_weight_per_type$Item_Weight[average_weight_per_type$Item_Type == item_type])
+  }
+}
+
+# Applicare la funzione ai valori NA in Item_Weight
+df$Item_Weight[is.na(df$Item_Weight)] <- mapply(fill_missing_weights, df$Item_Identifier[is.na(df$Item_Weight)], df$Item_Type[is.na(df$Item_Weight)])
+
+# Visualizzare il dataframe aggiornato
+head(df)
+
+
+```
+
+
+
 ```{r plots to see outliers}
 # Load necessary libraries
 library(ggplot2)
