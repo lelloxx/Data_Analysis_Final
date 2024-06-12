@@ -10,6 +10,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 Importing dataset and libraries
 ```{r df_import, include=FALSE}
+a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv"
+l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
+
 
 df= read.table("/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",") 
 library(dplyr)
@@ -23,7 +26,7 @@ Find for columns with missing values
 
 
 
-```{r unique values}
+```{r check for missing values}
 
 # Crea una copia del dataframe convertendo tutte le colonne in stringhe
 df_copy <- lapply(df, as.character)
@@ -552,4 +555,90 @@ for(var in categorical_vars) {
   print(p)
 }
 
+```
+
+
+```{R item visibility vs item mrp}
+# Load ggplot2
+library(ggplot2)
+
+
+# Create a scatter plot
+ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
+  geom_point(alpha = 0.5) +  # Use semi-transparent points to handle overplotting
+  labs(x = "Item Maximum Retail Price (MRP)",
+       y = "Item Visibility",
+       title = "Relationship between Item MRP and Item Visibility") +
+  theme_minimal()  # Clean minimalistic theme
+```
+
+```{R item visibility vs item mrp}
+# Create bins for Item MRP using a reasonable interval
+df$MRP_Bin <- cut(df$Item_MRP, breaks=seq(from=min(df$Item_MRP), to=max(df$Item_MRP), by=20), include.lowest=TRUE, right=TRUE)
+
+# Calculate average visibility per MRP bin
+average_visibility_per_mrp <- aggregate(Item_Visibility ~ MRP_Bin, data = df, mean)
+
+# Create a line graph
+ggplot(average_visibility_per_mrp, aes(x = MRP_Bin, y = Item_Visibility, group=1)) +
+  geom_line() +  # Adds a line graph
+  geom_point() +  # Adds points to each average point
+  labs(x = "Item MRP Range", y = "Average Item Visibility",
+       title = "Average Item Visibility Across Different MRP Ranges") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Improve x-axis label readability
+```
+
+gli item che fanno vedere di può sono quelli che vendono a di meno quindi quelli di cui vogliono sbarazzarsi.
+
+```{r Segmented Analysis Regression}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+
+
+# Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
+df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
+df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
+
+# Convert categorical variables to factors
+df$Item_Type <- as.factor(df$Item_Type)
+df$Outlet_Type <- as.factor(df$Outlet_Type)
+
+# Segmented Regression by Item Type
+item_type_models <- df %>%
+  group_by(Item_Type) %>%
+  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
+
+# Viewing summaries for each Item Type
+item_type_summaries <- lapply(item_type_models$model, summary)
+
+# Print the summaries for review
+print(item_type_summaries)
+
+# Segmented Regression by Outlet Type
+outlet_type_models <- df %>%
+  group_by(Outlet_Type) %>%
+  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
+
+# Viewing summaries for each Outlet Type
+outlet_type_summaries <- lapply(outlet_type_models$model, summary)
+
+# Print the summaries for review
+print(outlet_type_summaries)
+
+# Optional: Plotting the regression lines for each type on a scatter plot
+# Plotting for Item Type
+ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Item_Type)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ Item_Type) +
+  labs(title = "Item Visibility vs Outlet Sales by Item Type", x = "Item Visibility", y = "Outlet Sales")
+
+# Plotting for Outlet Type
+ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Outlet_Type)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ Outlet_Type) +
+  labs(title = "Item Visibility vs Outlet Sales by Outlet Type", x = "Item Visibility", y = "Outlet Sales")
 ```
