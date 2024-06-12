@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 Importing dataset and libraries
 ```{r df_import, include=FALSE}
 
-df= read.table("/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",")
+df= read.table("/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -412,3 +412,37 @@ ggplot(data = df, aes(x = Item_Outlet_Sales)) +
 #ciao2
 
 ```
+
+```{r Advanced visualization Visibility-Sales}
+# Creating scatter plots segmented by Item_Type
+p_item_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "blue", se = FALSE) +
+  facet_wrap(~ Item_Type) +
+  labs(title = "Item Visibility vs Outlet Sales by Item Type",
+       x = "Item Visibility", y = "Outlet Sales") +
+  theme_minimal()
+
+# Creating scatter plots segmented by Outlet_Type
+p_outlet_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  facet_wrap(~ Outlet_Type) +
+  labs(title = "Item Visibility vs Outlet Sales by Outlet Type",
+       x = "Item Visibility", y = "Outlet Sales") +
+  theme_minimal()
+
+# Print the plots
+print(p_item_type)
+print(p_outlet_type)
+```
+
+```{r Linear model to investigate on Item Visibility and Sales}
+# Fit a linear model
+model <- lm(Item_Outlet_Sales ~ Item_Visibility + Item_Type + Outlet_Type + Item_Fat_Content + Item_MRP, data = df)
+
+# Summary of the model to understand influences
+summary(model)
+```
+
+
