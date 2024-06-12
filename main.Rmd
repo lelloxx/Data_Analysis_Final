@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 Importing dataset and libraries
 ```{r df_import, include=FALSE}
 
-df= read.table("/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",")
+df= read.table("/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",")
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -140,7 +140,7 @@ df <- df %>%
   mutate(Outlet_Size = case_when(
     Outlet_Size == "Small" ~ 1,
     Outlet_Size == "Medium" ~ 2,
-    Outlet_Size == "Large" ~ 3,
+    Outlet_Size == "High" ~ 3,
     TRUE ~ NA_real_  # Imposta NA per qualsiasi altro valore non specificato
   ))
 
@@ -241,48 +241,33 @@ print(visibility_sum_per_store)
 ```
 
 ```{r Visibility}
-total_visibility_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df[df$Item_Visibility != 0,], sum)
-names(total_visibility_per_store)[2] <- "Total_Item_Visibility"
+# Caricare il dataset
 
-remaining_visibility_per_store <- 100 - total_visibility_per_store$Total_Item_Visibility
-remaining_visibility_per_store <- data.frame(Outlet_Identifier = total_visibility_per_store$Outlet_Identifier, Remaining_Visibility = remaining_visibility_per_store)
+# Filtrare i record con visibilità maggiore di zero per calcolare le medie
+filtered_df <- df[df$Item_Visibility > 0, ]
 
-zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
-names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
+# Calcolare la media di Item_Visibility per ogni combinazione di Item_Type e Outlet_Size
+visibility_avg_per_type_size <- aggregate(Item_Visibility ~ Item_Type + Outlet_Size, data = filtered_df, mean)
 
-df <- merge(df, zero_visibility_counts, by = "Outlet_Identifier", all.x = TRUE)
-df <- merge(df, remaining_visibility_per_store, by = "Outlet_Identifier", all.x = TRUE)
+# Creare una chiave unica per facilitare il merge
+visibility_avg_per_type_size$key <- with(visibility_avg_per_type_size, paste(Item_Type, Outlet_Size, sep = "_"))
+df$key <- with(df, paste(Item_Type, Outlet_Size, sep = "_"))
 
-impute_visibility <- function(item_visibility, zero_count, remaining_visibility) {
-  if (item_visibility == 0) {
-    if (is.na(zero_count) || zero_count == 0) {
-      return(0)  # No zeros to replace, retain zero
-    }
-    # Check for negative remaining visibility and set to a small positive number if necessary
-    if (remaining_visibility < 0) {
-      remaining_visibility <- mean(df$Item_Visibility[df$Item_Visibility != 0]*0.01, na.rm = TRUE)
-    }
-    return(remaining_visibility / zero_count)
-  } else {
-    return(item_visibility)
-  }
-}
+# Merge tra i record del dataframe originale e le medie calcolate usando un left join
+df <- merge(df, visibility_avg_per_type_size, by = "key", all.x = TRUE, suffixes = c("", ".new"))
 
-# Apply the function to impute zero values
-df$Item_Visibility <- mapply(impute_visibility, 
-                             df$Item_Visibility, 
-                             df$Zero_Item_Visibility_Count, 
-                             df$Remaining_Visibility)
-# Calculate the sum of Item_Visibility for each Outlet_Identifier to verify
-visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
-names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
+# Sostituire i valori zero di Item_Visibility con i valori medi calcolati
+df$Item_Visibility[df$Item_Visibility == 0] <- df$Item_Visibility.new[df$Item_Visibility == 0]
 
-# Display the result
-print(visibility_sum_per_store)
+# Rimuovere le colonne in più create dal merge
+df <- df[, !names(df) %in% c("Item_Visibility.new", "key")]
+
+# Visualizzare il dataframe aggiornato
+head(df)
 ```
 ```{r dropping useless columns}
 df <- df %>%
-  select(-Zero_Item_Visibility_Count, -Remaining_Visibility)
+  select(-Item_Type.new, -Outlet_Size.new)
 ```
 
 
