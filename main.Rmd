@@ -1,0 +1,398 @@
+---
+title: "main"
+output: pdf_document
+date: "2024-06-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Importing dataset and libraries
+```{r df_import, include=FALSE}
+
+df= read.table("/Users/alessandroausteri/Desktop/dab_project/BigMartSales.csv",header=TRUE, sep=",")
+library(dplyr)
+library(corrplot)
+library(ggplot2)
+library(gridExtra)
+```
+
+
+Firstly, we are going to fix all features in our dataset, we will start from the feature "Item_Fat_Content".
+
+We can see that there are different names for the same value:
+
+```{r unique values}
+item_fat_content_uniques <- unique(df$Item_Fat_Content)#unique values of item_fat_content
+
+print(item_fat_content_uniques)
+```
+As we can see, we have 2 different names for "Regular Fat" that are "Regular" and "reg"
+and 3 different names for "Low Fat" that are "Low fat", "low fat", "LF"
+
+To solve this problem, we can edit the column "Item_Fat_Content" in this way:
+
+all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
+
+Then we will print the uniques name of the column after the edit
+
+```{r sistemare nomi item_fat_content}
+df$Item_Fat_Content <- ifelse(grepl("^[Rr]", df$Item_Fat_Content), "Regular Fat", "Low Fat")
+item_fat_content_uniques <- unique(df$Item_Fat_Content)
+
+print(item_fat_content_uniques)
+
+```
+
+Now we should work on the column "Outlet_Size" since analyzing the dataset manually it's clear that there are many missing values.
+First of all, we should compute the percentage of missing values.
+
+```{r Outlet size analisy}
+#conteggio records senza Outlet_Size:
+null<-sum(nchar(df$Outlet_Size) ==0)
+
+#numero di records
+total<- nrow(df)
+
+print(paste("Number of rows with missing valuess on Outlet_Size:",null))
+
+#percentuale di righe senza outlet_size
+percentuale_stringhe_vuote <- (null / total) * 100
+
+#stampa percentuale di righe senza outlet_size
+
+print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
+```
+
+We want to find out if there are relations between the column "Outlet_Type" and the column "Outlet_Size" creating a table to see the number of combination between the outlet size and the outlet type.
+
+```{r outlet_size and outlet_type}
+# Creazione di una tabella di riepilogo
+outlet_summary <- df %>%
+  filter(Outlet_Size %in% c("Small", "Medium", "High")) %>%  # Filtra per includere solo le righe con i valori specificati
+  group_by(Outlet_Type, Outlet_Size) %>%  # Raggruppa per tipo e dimensione del negozio
+  summarise(Count = n(), .groups = 'drop')  # Calcola il conteggio e rimuove il raggruppamento automatico
+
+# Visualizzazione della tabella di riepilogo
+print(outlet_summary)
+```
+From this tab, we can see that all entries that are "Grocery Store" are small, and all entries that are "Supermarket Type2" or "Supermarket Type3" are Medium.
+Knowing this, we can substitute blank values of "Outlet_Size" of grocery with small, of type2 and type 3 with medium.
+
+```{r updating outlet_size}
+# Aggiornamento della colonna 'Outlet_Size'
+df <- df %>%
+  mutate(Outlet_Size = case_when(
+    Outlet_Type == "Grocery Store" ~ "Small",
+    #Outlet_Type %in% c("Supermarket Type2", "Supermarket Type3") ~ "Medium",
+    TRUE ~ Outlet_Size  # Mantiene il valore originale per tutte le altre condizioni
+  ))
+
+# Visualizza le modifiche per confermare
+# Creazione di una tabella di riepilogo
+outlet_summary <- df %>%
+  filter(Outlet_Size %in% c("Small", "Medium", "High")) %>%  # Filtra per includere solo le righe con i valori specificati
+  group_by(Outlet_Type, Outlet_Size) %>%  # Raggruppa per tipo e dimensione del negozio
+  summarise(Count = n(), .groups = 'drop')  # Calcola il conteggio e rimuove il raggruppamento automatico
+
+# Visualizzazione della tabella di riepilogo
+print(outlet_summary)
+
+```
+
+```{r Outlet size analisy 2}
+#conteggio records senza Outlet_Size:
+null<-sum(nchar(df$Outlet_Size) ==0)
+
+#numero di records
+total<- nrow(df)
+
+print(paste("Number of rows with missing valuess on Outlet_Size:",null))
+
+#percentuale di righe senza outlet_size
+percentuale_stringhe_vuote <- (null / total) * 100
+
+#stampa percentuale di righe senza outlet_size
+
+print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
+```
+Dopo aver riempito grocery store, supermarket type2 e supermarket type3, il numero di na è sceso dal 28% al 21%, passando da 2410 valori mancanti a 1855.
+
+Now we will fill the remaining missing values with n/a
+```{r adding na values}
+# Aggiornamento della colonna 'Outlet_Size' per riempire le stringhe vuote
+df <- df %>%
+  mutate(Outlet_Size = if_else(nchar(Outlet_Size) == 0, "NA", Outlet_Size))
+```
+
+
+Now, we want to convert as factor the columns "Item_Fat_Content" giving 0 to "Low Fat" and 1 to "Regular".
+And we also want to convert the column Outlet_Size:
+  1->Small
+  2->Medium
+  3->Large
+
+```{r factor converting}
+
+# Conversione di 'Outlet_Size' in valori numerici
+df <- df %>%
+  mutate(Outlet_Size = case_when(
+    Outlet_Size == "Small" ~ 1,
+    Outlet_Size == "Medium" ~ 2,
+    Outlet_Size == "Large" ~ 3,
+    TRUE ~ NA_real_  # Imposta NA per qualsiasi altro valore non specificato
+  ))
+
+df <- df%>%
+  mutate(Item_Fat_Content = case_when(
+    Item_Fat_Content == "Low Fat" ~ 1,
+    Item_Fat_Content == "Regular Fat" ~ 2,
+    TRUE ~ NA_real_
+  ))
+head(df)
+```
+```{r count 0 values}
+# Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
+zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
+
+# Rename the column for better understanding
+names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
+
+# Display the result
+print(zero_visibility_counts)
+```
+```{r plots to see outliers}
+# Load necessary libraries
+library(ggplot2)
+library(gridExtra)
+
+# Histogram and Box Plot for Item_Weight
+p1 <- ggplot(df, aes(x = Item_Weight)) + 
+  geom_histogram(binwidth = 1, fill = 'blue', alpha = 0.7) + 
+  ggtitle("Distribution of Item Weight") +
+  xlab("Item Weight") +
+  ylab("Frequency")
+
+p2 <- ggplot(df, aes(x = "", y = Item_Weight)) + 
+  geom_boxplot(fill = 'blue', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Weight") +
+  xlab("") +
+  ylab("Item Weight")
+
+# Histogram and Box Plot for Item_Visibility
+p3 <- ggplot(df, aes(x = Item_Visibility)) + 
+  geom_histogram(binwidth = 0.01, fill = 'green', alpha = 0.7) + 
+  ggtitle("Distribution of Item Visibility") +
+  xlab("Item Visibility") +
+  ylab("Frequency")
+
+p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
+  geom_boxplot(fill = 'green', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Visibility") +
+  xlab("") +
+  ylab("Item Visibility")
+
+# Histogram and Box Plot for Item_MRP
+p5 <- ggplot(df, aes(x = Item_MRP)) + 
+  geom_histogram(binwidth = 5, fill = 'red', alpha = 0.7) + 
+  ggtitle("Distribution of Item MRP") +
+  xlab("Item MRP") +
+  ylab("Frequency")
+
+p6 <- ggplot(df, aes(x = "", y = Item_MRP)) + 
+  geom_boxplot(fill = 'red', alpha = 0.7) + 
+  ggtitle("Box Plot of Item MRP") +
+  xlab("") +
+  ylab("Item MRP")
+
+# Histogram and Box Plot for Item_Outlet_Sales
+p7 <- ggplot(df, aes(x = Item_Outlet_Sales)) + 
+  geom_histogram(binwidth = 100, fill = 'purple', alpha = 0.7) + 
+  ggtitle("Distribution of Item Outlet Sales") +
+  xlab("Item Outlet Sales") +
+  ylab("Frequency")
+
+p8 <- ggplot(df, aes(x = "", y = Item_Outlet_Sales)) + 
+  geom_boxplot(fill = 'purple', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Outlet Sales") +
+  xlab("") +
+  ylab("Item Outlet Sales")
+
+# Print the plots individually
+print(p1)
+print(p2)
+print(p3)
+print(p4)
+print(p5)
+print(p6)
+print(p7)
+print(p8)
+
+```
+
+```{r count 0 values for each store}
+
+visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
+names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
+
+# Display the result
+print(visibility_sum_per_store)
+```
+
+```{r Visibility}
+total_visibility_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df[df$Item_Visibility != 0,], sum)
+names(total_visibility_per_store)[2] <- "Total_Item_Visibility"
+
+remaining_visibility_per_store <- 100 - total_visibility_per_store$Total_Item_Visibility
+remaining_visibility_per_store <- data.frame(Outlet_Identifier = total_visibility_per_store$Outlet_Identifier, Remaining_Visibility = remaining_visibility_per_store)
+
+zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
+names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
+
+df <- merge(df, zero_visibility_counts, by = "Outlet_Identifier", all.x = TRUE)
+df <- merge(df, remaining_visibility_per_store, by = "Outlet_Identifier", all.x = TRUE)
+
+impute_visibility <- function(item_visibility, zero_count, remaining_visibility) {
+  if (item_visibility == 0) {
+    if (is.na(zero_count) || zero_count == 0) {
+      return(0)  # No zeros to replace, retain zero
+    }
+    # Check for negative remaining visibility and set to a small positive number if necessary
+    if (remaining_visibility < 0) {
+      remaining_visibility <- mean(df$Item_Visibility[df$Item_Visibility != 0]*0.01, na.rm = TRUE)
+    }
+    return(remaining_visibility / zero_count)
+  } else {
+    return(item_visibility)
+  }
+}
+
+# Apply the function to impute zero values
+df$Item_Visibility <- mapply(impute_visibility, 
+                             df$Item_Visibility, 
+                             df$Zero_Item_Visibility_Count, 
+                             df$Remaining_Visibility)
+# Calculate the sum of Item_Visibility for each Outlet_Identifier to verify
+visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
+names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
+
+# Display the result
+print(visibility_sum_per_store)
+```
+```{r dropping useless columns}
+df <- df %>%
+  select(-Zero_Item_Visibility_Count, -Remaining_Visibility)
+```
+
+
+```{r visibility plot}
+# Histogram and Box Plot for Item_Visibility
+p3 <- ggplot(df, aes(x = Item_Visibility)) + 
+  geom_histogram(binwidth = 0.01, fill = 'green', alpha = 0.7) + 
+  ggtitle("Distribution of Item Visibility") +
+  xlab("Item Visibility") +
+  ylab("Frequency")
+
+p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
+  geom_boxplot(fill = 'green', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Visibility") +
+  xlab("") +
+  ylab("Item Visibility")
+print(p3)
+print(p4)
+```
+
+
+```{r Removing Duplicates}
+# Check for entire row duplicates
+duplicates_entire_row <- duplicated(df)
+
+# Count the number of entirely duplicated rows
+num_entire_row_duplicates <- sum(duplicates_entire_row)
+print(paste("Number of entirely duplicated rows:", num_entire_row_duplicates))
+
+# View the duplicated rows
+entire_row_duplicate_entries <- df[duplicates_entire_row, ]
+print("Entirely duplicated rows:")
+print(entire_row_duplicate_entries)
+```
+
+Now we will start to find out some correlations between variables.
+
+```{R corr matrix}
+
+# Calculate Spearman's rank correlation matrix again if not already calculated
+cor_matrix <- cor(df %>% select(where(is.numeric)), 
+                  method = "spearman", 
+                  use = "pairwise.complete.obs")
+
+# Visualize the correlation matrix with coefficients inside the circles
+corrplot(cor_matrix, method = "circle", type = "upper", order = "hclust",
+         tl.col = "black", tl.srt = 45, tl.cex = 0.8, cl.cex = 0.8,
+         col = colorRampPalette(c("#6BAED6", "#FFFFFF", "#FD8D3C"))(200),
+         addCoef.col = "black",  # Sets color of the coefficients to black (choose based on your color scheme)
+         number.cex = 0.6)  # Adjust coefficient text size appropriately
+
+```
+DOBBIAMO DROPPARE LE COLONNE REMINAINING VISIBILITY EZERO ITEM VISIBILITY COUNT
+
+
+
+We can see that there are big positive relation between:
+
+outlet_size-item visibility
+item_outlet_sales and outlet_size
+item_mrp and item_outlet_sales
+
+```{r item MRP vs Outlet Sales}
+library(ggplot2)
+ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Relationship between Item MRP and Outlet Sales",
+       x = "Item MRP", y = "Outlet Sales")
+```
+```{R item outlet sales by outlet size}
+ggplot(df, aes(x = Outlet_Size, y = Item_Outlet_Sales)) +
+  geom_boxplot(aes(fill = Outlet_Size)) +
+  labs(title = "Item Outlet Sales by Outlet Size",
+       x = "Outlet Size", y = "Outlet Sales")
+```
+
+```{R Sales trends over the years}
+ggplot(df, aes(x = Outlet_Establishment_Year, y = Item_Outlet_Sales)) +
+  geom_point(aes(color = Outlet_Establishment_Year)) +
+  geom_smooth(method = "lm") +
+  labs(title = "Sales Trends Over the Years",
+       x = "Establishment Year", y = "Outlet Sales")
+
+```
+
+```{R Relationship between Item MRP and Outlet Sales by Product Type}
+
+library(dplyr)
+
+df_summary <- df %>%
+  group_by(Item_Type, MRP_Bracket = cut(Item_MRP, breaks = seq(0, max(Item_MRP), by = 20))) %>%
+  summarize(Average_Sales = mean(Item_Outlet_Sales), .groups = 'drop')
+
+ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average Outlet Sales by MRP Bracket and Product Type",
+       x = "MRP Bracket",
+       y = "Average Outlet Sales") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+zi qua c'è scritto che più vendi e più alzi il prezzo di base
+
+```{R  Item_Outlet_Sales density plot}
+# Create a density plot
+ggplot(data = df, aes(x = Item_Outlet_Sales)) +
+  geom_density(fill = "turquoise", alpha = 0.5) +  # 'alpha' controls transparency
+  labs(title = "Density Plot of Item Outlet Sales",
+       x = "Item Outlet Sales",
+       y = "Density") +
+  theme_light()
+```
