@@ -445,4 +445,46 @@ model <- lm(Item_Outlet_Sales ~ Item_Visibility + Item_Type + Outlet_Type + Item
 summary(model)
 ```
 
+```{r Distribution of Variables across Item Sales}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
 
+# Convert categorical variables to factor if not already
+df$Item_Type <- as.factor(df$Item_Type)
+df$Outlet_Type <- as.factor(df$Outlet_Type)
+df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
+df$Outlet_Size <- as.factor(df$Outlet_Size)
+df$Outlet_Location_Type <- as.factor(df$Outlet_Location_Type)
+
+# Continuous Variables
+continuous_vars <- c("Item_Weight", "Item_Visibility", "Item_MRP")
+
+# Categorical Variables
+categorical_vars <- c("Item_Type", "Outlet_Type", "Item_Fat_Content", "Outlet_Size", "Outlet_Location_Type")
+
+# Plotting Distribution of Sales for Continuous Variables
+for(var in continuous_vars) {
+  p <- ggplot(df, aes_string(x = var, y = "Item_Outlet_Sales")) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "lm", color = "blue") +
+    labs(title = paste("Scatter Plot of", var, "vs Outlet Sales"),
+         x = var, y = "Outlet Sales") +
+    theme_minimal()
+  print(p)
+}
+
+# Plotting Distribution of Sales for Categorical Variables
+for(var in categorical_vars) {
+  p <- df %>%
+    group_by_(.dots = var) %>%
+    summarise(Average_Sales = mean(Item_Outlet_Sales)) %>%
+    ggplot(aes_string(x = var, y = "Average_Sales", fill = var)) +
+    geom_bar(stat = "identity", color = "black") +
+    labs(title = paste("Average Sales by", var),
+         x = var, y = "Average Sales") +
+    theme_minimal()
+  print(p)
+}
+
+```
