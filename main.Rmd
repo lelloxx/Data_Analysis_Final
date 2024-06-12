@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 Importing dataset and libraries
 ```{r df_import, include=FALSE}
 
-df= read.table("/Users/alessandroausteri/Desktop/dab_project/BigMartSales.csv",header=TRUE, sep=",")
+df= read.table("/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",")
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -352,6 +352,31 @@ ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
   labs(title = "Relationship between Item MRP and Outlet Sales",
        x = "Item MRP", y = "Outlet Sales")
 ```
+
+```{r item MRP vs Outlet sales with gaps of price }
+# Load necessary libraries
+library(ggplot2)
+
+# Specific price points to add to the plot
+specific_price_points <- c(67.99, 134.49, 199.99)
+
+# Plot the relationship between Item_MRP and Item_Outlet_Sales
+p <- ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.5) +
+  labs(title = "Relationship between Item MRP and Outlet Sales",
+       x = "Item MRP", y = "Outlet Sales")
+
+# Add vertical lines for specific price points
+for (price in specific_price_points) {
+  p <- p + geom_vline(xintercept = price, linetype = "dotted", color = "blue", alpha = 0.7)
+  p <- p + annotate("text", x = price, y = max(df$Item_Outlet_Sales) * 0.9, label = price, color = "blue", angle = 90, vjust = -0.5, size = 3)
+}
+
+# Print the plot
+print(p)
+
+```
+
 ```{R item outlet sales by outlet size}
 ggplot(df, aes(x = Outlet_Size, y = Item_Outlet_Sales)) +
   geom_boxplot(aes(fill = Outlet_Size)) +
