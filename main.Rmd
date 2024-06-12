@@ -384,7 +384,7 @@ ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Ty
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 #ciaociao
-
+#namooo
 ```
 
 zi qua c'è scritto che più vendi e più alzi il prezzo di base
