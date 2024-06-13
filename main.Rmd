@@ -14,18 +14,51 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table("/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.csv",header=TRUE, sep=",") 
+df= read.table(l,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
 library(gridExtra)
 ```
+#EDA
+##Data Cleaning
 
-Find for columns with missing values
+###Checking and Removing Duplicates
+```{r Removing Duplicates}
+# Check for entire row duplicates
+duplicates_entire_row <- duplicated(df)
+
+# Count the number of entirely duplicated rows
+num_entire_row_duplicates <- sum(duplicates_entire_row)
+print(paste("Number of entirely duplicated rows:", num_entire_row_duplicates))
+```
+As we can see there aren’t any duplicates in our data set, so we can proceed to find which columns have missing values
+
+###Fixing Features of the Dataset
+
+ 
+```{r unique values}
+item_fat_content_uniques <- unique(df$Item_Fat_Content)#unique values of item_fat_content
+
+print(item_fat_content_uniques)
+```
+
+```{r sistemare nomi item_fat_content}
+df$Item_Fat_Content <- ifelse(grepl("^[Rr]", df$Item_Fat_Content), "Regular Fat", "Low Fat")
+item_fat_content_uniques <- unique(df$Item_Fat_Content)
+
+print(item_fat_content_uniques)
+
+```
+If we go throughout the column `Item_Fat_Content` we can cearly see that there are some inconsistencies, in fact we have 2 different names for "Regular Fat" that are "Regular" and "reg" and 3 different names for "Low Fat" that are "Low fat", "low fat", "LF"
+
+To solve this problem, we edited the column "Item_Fat_Content" in this way:
+all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
+
+Then we will print the uniques name of the column after the edit to chek if the process ended successfully 
 
 
-
-
+###Checking for Missing Values
 ```{r check for missing values}
 
 # Crea una copia del dataframe convertendo tutte le colonne in stringhe
@@ -50,37 +83,6 @@ We see that there are 3 columns with missing values:
 -Outlet_Size
 
 
-
-
-Firstly, we are going to fix all features in our dataset, we will start from the feature "Item_Fat_Content".
-
-We can see that there are different names for the same value:
-
-```{r unique values}
-item_fat_content_uniques <- unique(df$Item_Fat_Content)#unique values of item_fat_content
-
-print(item_fat_content_uniques)
-```
-As we can see, we have 2 different names for "Regular Fat" that are "Regular" and "reg"
-and 3 different names for "Low Fat" that are "Low fat", "low fat", "LF"
-
-To solve this problem, we can edit the column "Item_Fat_Content" in this way:
-
-all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
-
-Then we will print the uniques name of the column after the edit
-
-```{r sistemare nomi item_fat_content}
-df$Item_Fat_Content <- ifelse(grepl("^[Rr]", df$Item_Fat_Content), "Regular Fat", "Low Fat")
-item_fat_content_uniques <- unique(df$Item_Fat_Content)
-
-print(item_fat_content_uniques)
-
-```
-
-Now we should work on the column "Outlet_Size" since analyzing the dataset manually it's clear that there are many missing values.
-First of all, we should compute the percentage of missing values.
-
 ```{r Outlet size analisy}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
@@ -98,20 +100,24 @@ percentuale_stringhe_vuote <- (null / total) * 100
 print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
 ```
 
-We want to find out if there are relations between the column "Outlet_Type" and the column "Outlet_Size" creating a table to see the number of combination between the outlet size and the outlet type.
 
-```{r outlet_size and outlet_type}
-# Creazione di una tabella di riepilogo
-outlet_summary <- df %>%
-  filter(Outlet_Size %in% c("Small", "Medium", "High")) %>%  # Filtra per includere solo le righe con i valori specificati
-  group_by(Outlet_Type, Outlet_Size) %>%  # Raggruppa per tipo e dimensione del negozio
-  summarise(Count = n(), .groups = 'drop')  # Calcola il conteggio e rimuove il raggruppamento automatico
 
-# Visualizzazione della tabella di riepilogo
-print(outlet_summary)
+```{r Outlet size analisy 2}
+#conteggio records senza Outlet_Size:
+null<-sum(nchar(df$Outlet_Size) ==0)
+
+#numero di records
+total<- nrow(df)
+
+print(paste("Number of rows with missing valuess on Outlet_Size:",null))
+
+#percentuale di righe senza outlet_size
+percentuale_stringhe_vuote <- (null / total) * 100
+
+#stampa percentuale di righe senza outlet_size
+
+print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
 ```
-From this tab, we can see that all entries that are "Grocery Store" are small, and all entries that are "Supermarket Type2" or "Supermarket Type3" are Medium.
-Knowing this, we can substitute blank values of "Outlet_Size" of grocery with small, of type2 and type 3 with medium.
 
 ```{r updating outlet_size}
 # Aggiornamento della colonna 'Outlet_Size'
@@ -134,37 +140,23 @@ print(outlet_summary)
 
 ```
 
-```{r Outlet size analisy 2}
-#conteggio records senza Outlet_Size:
-null<-sum(nchar(df$Outlet_Size) ==0)
-
-#numero di records
-total<- nrow(df)
-
-print(paste("Number of rows with missing valuess on Outlet_Size:",null))
-
-#percentuale di righe senza outlet_size
-percentuale_stringhe_vuote <- (null / total) * 100
-
-#stampa percentuale di righe senza outlet_size
-
-print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
-```
-Dopo aver riempito grocery store, supermarket type2 e supermarket type3, il numero di na è sceso dal 28% al 21%, passando da 2410 valori mancanti a 1855.
-
-Now we will fill the remaining missing values with n/a
 ```{r adding na values}
 # Aggiornamento della colonna 'Outlet_Size' per riempire le stringhe vuote
 df <- df %>%
   mutate(Outlet_Size = if_else(nchar(Outlet_Size) == 0, "NA", Outlet_Size))
 ```
+To address the significant number of missing values were noted in the `Outlet_Size` column, we first calculated the percentage of missing entries to understand the scope of the issue.
 
+Subsequently, we explored potential relationships between `Outlet_Type` and `Outlet_Size` by creating a cross-tabulation of these variables. This analysis revealed distinct patterns: all entries categorized as "Grocery Store" were consistently labeled as "Small", while "Supermarket Type2" and "Supermarket Type3" were uniformly classified as "Medium".
 
-Now, we want to convert as factor the columns "Item_Fat_Content" giving 0 to "Low Fat" and 1 to "Regular".
-And we also want to convert the column Outlet_Size:
-  1->Small
-  2->Medium
-  3->Large
+Considering this insight, we proceeded to change missing `Outlet_Size` values based on `Outlet_Type`:
+
+For "Grocery Store", missing sizes were filled with "Small".
+For "Supermarket Type2" and "Supermarket Type3", missing sizes were filled with "Medium".
+These imputations reduced the percentage of missing values from 28% to 21%, decreasing the total number of missing entries from 2410 to 1855.
+
+Regarding "Supermarket Type1" we do not have enough informations or clear patterns, so we had to fill the remaining missing entries with a placeholder value of "NA", ensuring no data point within "Outlet_Size" remained unaddressed.
+
 
 ```{r factor converting}
 
@@ -185,22 +177,15 @@ df <- df%>%
   ))
 head(df)
 ```
-```{r count 0 values}
-# Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
-zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
+We converted as factor the columns `Item_Fat_Content` and we also want to convert the column `Outlet_Size` giving respectively:
+0 -> "Low Fat" 
+1 -> "Regular"
 
-# Rename the column for better understanding
-names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
+1 -> Small
+2 -> Medium
+3 -> Large
 
-# Display the result
-print(zero_visibility_counts)
-```
 
-Now we want to fill also the empty rows of the column "Item_Weight". 
-The first idea was to use the general mean of "Item_Weight", but since we have also the category of each product, we can compute the mean of every product category.
-At the end, we will check for every record with missing "Item_Weight" and we will do a double check:
-1. if there is another item with the same id and missing weight, they will have for sure the same weight.
-2. We will put in item_weight, the mean of the weights of the products of the same category.
 
 
 ```{r handling missing item_weight}
@@ -227,79 +212,25 @@ head(df)
 
 
 ```
+Here we handled missing values for `Item_Weight`. 
+The first idea was to use the general mean of `Item_Weight`, but since we have also the category of each product, we can compute the mean of every product category.
+At the end, we checked for every record with missing `Item_Weight` and we will do a double check:
+1. If there were another item with the same id and missing weight, they will have for sure the same weight.
+2. We will put in item_weight, the mean of the weights of the products of the same category.
 
 
+```{r count 0 values}
+# Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
+zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
 
-```{r plots to see outliers}
-# Load necessary libraries
-library(ggplot2)
-library(gridExtra)
+# Rename the column for better understanding
+names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
 
-# Histogram and Box Plot for Item_Weight
-p1 <- ggplot(df, aes(x = Item_Weight)) + 
-  geom_histogram(binwidth = 1, fill = 'blue', alpha = 0.7) + 
-  ggtitle("Distribution of Item Weight") +
-  xlab("Item Weight") +
-  ylab("Frequency")
-
-p2 <- ggplot(df, aes(x = "", y = Item_Weight)) + 
-  geom_boxplot(fill = 'blue', alpha = 0.7) + 
-  ggtitle("Box Plot of Item Weight") +
-  xlab("") +
-  ylab("Item Weight")
-
-# Histogram and Box Plot for Item_Visibility
-p3 <- ggplot(df, aes(x = Item_Visibility)) + 
-  geom_histogram(binwidth = 0.01, fill = 'green', alpha = 0.7) + 
-  ggtitle("Distribution of Item Visibility") +
-  xlab("Item Visibility") +
-  ylab("Frequency")
-
-p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
-  geom_boxplot(fill = 'green', alpha = 0.7) + 
-  ggtitle("Box Plot of Item Visibility") +
-  xlab("") +
-  ylab("Item Visibility")
-
-# Histogram and Box Plot for Item_MRP
-p5 <- ggplot(df, aes(x = Item_MRP)) + 
-  geom_histogram(binwidth = 5, fill = 'red', alpha = 0.7) + 
-  ggtitle("Distribution of Item MRP") +
-  xlab("Item MRP") +
-  ylab("Frequency")
-
-p6 <- ggplot(df, aes(x = "", y = Item_MRP)) + 
-  geom_boxplot(fill = 'red', alpha = 0.7) + 
-  ggtitle("Box Plot of Item MRP") +
-  xlab("") +
-  ylab("Item MRP")
-
-# Histogram and Box Plot for Item_Outlet_Sales
-p7 <- ggplot(df, aes(x = Item_Outlet_Sales)) + 
-  geom_histogram(binwidth = 100, fill = 'purple', alpha = 0.7) + 
-  ggtitle("Distribution of Item Outlet Sales") +
-  xlab("Item Outlet Sales") +
-  ylab("Frequency")
-
-p8 <- ggplot(df, aes(x = "", y = Item_Outlet_Sales)) + 
-  geom_boxplot(fill = 'purple', alpha = 0.7) + 
-  ggtitle("Box Plot of Item Outlet Sales") +
-  xlab("") +
-  ylab("Item Outlet Sales")
-
-# Print the plots individually
-print(p1)
-print(p2)
-print(p3)
-print(p4)
-print(p5)
-print(p6)
-print(p7)
-print(p8)
-
+# Display the result
+print(zero_visibility_counts)
 ```
 
-```{r count 0 values for each store}
+```{r count Visibility for each store}
 
 visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
 names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
@@ -355,21 +286,16 @@ p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) +
 print(p3)
 print(p4)
 ```
+Finally we fixed the missing values for `Item_Visibility`. To do it we firstly count the number of missing values for each of the 10 shops and their visibility to understand how much visibility we are missing from each store. Our first idea was to subtract each visibility percentage from 100% and then equally divide the remaining visibility among the number of missing visibility product. In doing that we obtained biased and not consistent data because:
 
+1. The filled visibility in each product was too high compared to the non-zeros values
+2. After adding again all the visibility the result was 100% for each shop, but could also be true that in some shops some products are out of stock so the final visibility could be less than 100%
 
-```{r Removing Duplicates}
-# Check for entire row duplicates
-duplicates_entire_row <- duplicated(df)
+For this reason we decided to change our strategy and to fill the missing values we firstly find the missing `Item_Visibility`, then through the `Item_ID` we find all the shops that have for that product a real value, then we check the `Outlet_Size` of each shop and compare to the one of the market with missing value if it's the same we compute the mean throu all the visibility that match these criteria.
 
-# Count the number of entirely duplicated rows
-num_entire_row_duplicates <- sum(duplicates_entire_row)
-print(paste("Number of entirely duplicated rows:", num_entire_row_duplicates))
+We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
 
-# View the duplicated rows
-entire_row_duplicate_entries <- df[duplicates_entire_row, ]
-print("Entirely duplicated rows:")
-print(entire_row_duplicate_entries)
-```
+##Multivariate Analysis
 
 Now we will start to find out some correlations between variables.
 
@@ -482,6 +408,25 @@ ggplot(data = df, aes(x = Item_Outlet_Sales)) +
 ```
 
 ```{r Advanced visualization Visibility-Sales}
+# Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
+df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
+df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
+
+# Convert categorical variables to factors
+df$Item_Type <- as.factor(df$Item_Type)
+df$Outlet_Type <- as.factor(df$Outlet_Type)
+
+# Segmented Regression by Item Type
+item_type_models <- df %>%
+  group_by(Item_Type) %>%
+  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
+
+# Viewing summaries for each Item Type
+item_type_summaries <- lapply(item_type_models$model, summary)
+
+# Print the summaries for review
+print(item_type_summaries)
+
 # Creating scatter plots segmented by Item_Type
 p_item_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
   geom_point(alpha = 0.5) +
@@ -558,7 +503,7 @@ for(var in categorical_vars) {
 ```
 
 
-```{R item visibility vs item mrp}
+```{R item visibility vs item mrp scatterplot}
 # Load ggplot2
 library(ggplot2)
 
@@ -572,7 +517,7 @@ ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
   theme_minimal()  # Clean minimalistic theme
 ```
 
-```{R item visibility vs item mrp}
+```{R item visibility vs item mrp line graph}
 # Create bins for Item MRP using a reasonable interval
 df$MRP_Bin <- cut(df$Item_MRP, breaks=seq(from=min(df$Item_MRP), to=max(df$Item_MRP), by=20), include.lowest=TRUE, right=TRUE)
 
@@ -597,24 +542,7 @@ library(ggplot2)
 library(dplyr)
 
 
-# Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
-df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
-df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
 
-# Convert categorical variables to factors
-df$Item_Type <- as.factor(df$Item_Type)
-df$Outlet_Type <- as.factor(df$Outlet_Type)
-
-# Segmented Regression by Item Type
-item_type_models <- df %>%
-  group_by(Item_Type) %>%
-  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
-
-# Viewing summaries for each Item Type
-item_type_summaries <- lapply(item_type_models$model, summary)
-
-# Print the summaries for review
-print(item_type_summaries)
 
 # Segmented Regression by Outlet Type
 outlet_type_models <- df %>%
@@ -641,4 +569,74 @@ ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Outlet_Type))
   geom_smooth(method = "lm", se = FALSE) +
   facet_wrap(~ Outlet_Type) +
   labs(title = "Item Visibility vs Outlet Sales by Outlet Type", x = "Item Visibility", y = "Outlet Sales")
+```
+###Checking for Outliers
+
+```{r plots to see outliers}
+# Load necessary libraries
+library(ggplot2)
+library(gridExtra)
+
+# Histogram and Box Plot for Item_Weight
+p1 <- ggplot(df, aes(x = Item_Weight)) + 
+  geom_histogram(binwidth = 1, fill = 'blue', alpha = 0.7) + 
+  ggtitle("Distribution of Item Weight") +
+  xlab("Item Weight") +
+  ylab("Frequency")
+
+p2 <- ggplot(df, aes(x = "", y = Item_Weight)) + 
+  geom_boxplot(fill = 'blue', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Weight") +
+  xlab("") +
+  ylab("Item Weight")
+
+# Histogram and Box Plot for Item_Visibility
+p3 <- ggplot(df, aes(x = Item_Visibility)) + 
+  geom_histogram(binwidth = 0.01, fill = 'green', alpha = 0.7) + 
+  ggtitle("Distribution of Item Visibility") +
+  xlab("Item Visibility") +
+  ylab("Frequency")
+
+p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
+  geom_boxplot(fill = 'green', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Visibility") +
+  xlab("") +
+  ylab("Item Visibility")
+
+# Histogram and Box Plot for Item_MRP
+p5 <- ggplot(df, aes(x = Item_MRP)) + 
+  geom_histogram(binwidth = 5, fill = 'red', alpha = 0.7) + 
+  ggtitle("Distribution of Item MRP") +
+  xlab("Item MRP") +
+  ylab("Frequency")
+
+p6 <- ggplot(df, aes(x = "", y = Item_MRP)) + 
+  geom_boxplot(fill = 'red', alpha = 0.7) + 
+  ggtitle("Box Plot of Item MRP") +
+  xlab("") +
+  ylab("Item MRP")
+
+# Histogram and Box Plot for Item_Outlet_Sales
+p7 <- ggplot(df, aes(x = Item_Outlet_Sales)) + 
+  geom_histogram(binwidth = 100, fill = 'purple', alpha = 0.7) + 
+  ggtitle("Distribution of Item Outlet Sales") +
+  xlab("Item Outlet Sales") +
+  ylab("Frequency")
+
+p8 <- ggplot(df, aes(x = "", y = Item_Outlet_Sales)) + 
+  geom_boxplot(fill = 'purple', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Outlet Sales") +
+  xlab("") +
+  ylab("Item Outlet Sales")
+
+# Print the plots individually
+print(p1)
+print(p2)
+print(p3)
+print(p4)
+print(p5)
+print(p6)
+print(p7)
+print(p8)
+
 ```
