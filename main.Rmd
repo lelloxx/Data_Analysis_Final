@@ -14,7 +14,7 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(l,header=TRUE, sep=",") 
+df= read.table(a,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -638,5 +638,96 @@ print(p5)
 print(p6)
 print(p7)
 print(p8)
+
+```
+
+# Lower Dimensional Models
+```{r Impact of item MRP ad Outlet Type on Sales }
+model_mrp_outlet <- lm(Item_Outlet_Sales ~ Item_MRP * Outlet_Type, data = df)
+summary(model_mrp_outlet)
+
+# Plotting this relationship
+ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales, color = Outlet_Type)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~Outlet_Type) +
+  labs(title = "Impact of MRP and Outlet Type on Sales")
+```
+## Visualization Interpretation
+
+The scatter plots across different outlet types (Grocery Store, Supermarket Type1, Type2, and Type3) show how Item_MRP influences sales:
+
+Grocery Store: The sales seem mostly flat regardless of the MRP, suggesting that price changes do not significantly influence sales in grocery stores. This could indicate price sensitivity or a limited range of products where price does not play a major role.
+
+Supermarket Type1: There appears to be a moderate positive relationship between MRP and sales. This indicates that as the price of an item increases, sales also tend to increase, possibly due to a perception of higher quality or the availability of a wider range of products.
+
+Supermarket Type2: Similar to Type1, but the relationship looks slightly weaker. This might be due to different customer demographics or store locations.
+
+Supermarket Type3: Shows a strong positive relationship between MRP and sales, suggesting that customers at Type3 supermarkets are less price-sensitive and possibly more driven by product quality or brand.
+
+Model Summary Interpretation
+The regression output provides the following insights:
+
+Intercept: The intercept is not meaningful on its own without context as it represents sales when MRP is zero and not belonging to any specific outlet type, which is not a practical scenario.
+
+Item_MRP: There's a significant positive coefficient for MRP, indicating that overall, an increase in MRP tends to lead to an increase in sales across the dataset.
+
+Outlet_Type Coefficients:
+
+Supermarket Type1: The interaction term Item_MRP:Outlet_TypeSupermarket Type1 is significant and positive, which supports the visual interpretation that higher MRP increases sales more in this supermarket type compared to the baseline (Grocery Store).
+Supermarket Type2: Similarly, the positive coefficient for the interaction with MRP suggests increased sales with higher MRP, but the effect is smaller than in Type1.
+Supermarket Type3: Exhibits the strongest positive interaction effect with MRP, indicating that sales in these stores are most positively influenced by higher MRP.
+Model Fit:
+
+The Multiple R-squared value is 0.6054, meaning that about 60.54% of the variability in sales is explained by the model, which is reasonably good given the complexity of retail sales dynamics.
+The F-statistic is highly significant (p < 2.2e-16), indicating that the model is statistically significant and that the model fits the data better than a model with no predictors.
+Conclusions
+This analysis suggests that MRP and outlet type are significant predictors of sales. Higher MRP generally leads to higher sales, especially in supermarket types where customers might be less sensitive to price increases. Grocery stores show minimal changes in sales with changes in MRP, indicating a different customer base or purchase behavior.
+
+These insights can help BigMart tailor its pricing strategies according to the type of outlet, potentially focusing on premium pricing strategies in supermarket types where the customer base responds positively to higher-priced items.
+
+
+
+
+#Feature Engineering
+```{r feature engineering}
+df <- df %>%
+  mutate(
+    # Convert Establishment Year to Age
+    Outlet_Age = as.numeric(format(Sys.Date(), "%Y")) - Outlet_Establishment_Year,
+    
+    # Interaction between MRP and Outlet Type
+    MRP_x_OutletType = Item_MRP * as.numeric(as.factor(Outlet_Type)),
+    
+    # Visibility scaled
+    Visibility_Scaled = sqrt(Item_Visibility),
+    
+    # Simplifying Item Type
+    Item_Type_Simplified = case_when(
+      grepl("Foods", Item_Type) ~ "Foods",
+      grepl("Drinks", Item_Type) ~ "Drinks",
+      TRUE ~ "Non-Consumables"
+    )
+  )
+
+# Ensure that categorical variables are in the correct format
+df$Outlet_Type <- as.factor(df$Outlet_Type)
+df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
+df$Item_Type_Simplified <- as.factor(df$Item_Type_Simplified)
+df$Outlet_Identifier <- as.factor(df$Outlet_Identifier)
+```
+
+Feature Selection with Stepwise Regression
+
+```{r feature selection with stepwise regression}
+library(MASS)
+
+# Set up the full model with all predictors
+full_model <- lm(Item_Outlet_Sales ~ ., data = df)
+
+# Perform stepwise regression based on AIC
+stepwise_model <- stepAIC(full_model, direction = "both")
+summary(stepwise_model)
+final_formula <- formula(stepwise_model)
 
 ```
