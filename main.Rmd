@@ -14,7 +14,7 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(a,header=TRUE, sep=",") 
+df= read.table(l,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -294,6 +294,18 @@ Finally we fixed the missing values for `Item_Visibility`. To do it we firstly c
 For this reason we decided to change our strategy and to fill the missing values we firstly find the missing `Item_Visibility`, then through the `Item_ID` we find all the shops that have for that product a real value, then we check the `Outlet_Size` of each shop and compare to the one of the market with missing value if it's the same we compute the mean throu all the visibility that match these criteria.
 
 We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
+
+
+
+
+```{r count Visibility for each store}
+
+visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
+names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
+
+# Display the result
+print(visibility_sum_per_store)
+```
 
 ##Multivariate Analysis
 
@@ -789,5 +801,57 @@ Feature Selection with Stepwise Regression
 #stepwise_model <- stepAIC(full_model, direction = "both")
 #summary(stepwise_model)
 #final_formula <- formula(stepwise_model)
+#```
 
+
+```{r calculating Outlet Age}
+# Add a new column 'Outlet_Age' to the dataframe
+df <- df %>%
+  mutate(Outlet_Age = as.numeric(format(Sys.Date(), "%Y")) - Outlet_Establishment_Year)
+
+# Display the age of each store
+# This creates a summary table with Outlet_ID and its corresponding Outlet_Age
+store_ages <- df %>%
+  select(Outlet_Identifier, Outlet_Age) %>%  # Select the necessary columns
+  distinct() %>%  # Remove duplicate rows to ensure each store is listed once
+  arrange(Outlet_Identifier)  # Optional: Sort by Outlet Identifier for easier reading
+
+# Print the resulting table to see each store's age
+print(store_ages)
+
+# Aggregate total sales by Outlet_ID
+sales_summary <- df %>%
+  group_by(Outlet_Identifier) %>%
+  summarise(Total_Sales = sum(Item_Outlet_Sales)) %>%
+  ungroup()
+# Merge sales summary with store ages
+sales_with_age <- merge(sales_summary, store_ages, by = "Outlet_Identifier")
+# Load the ggplot2 library
+library(ggplot2)
+
+# Plot total sales by Outlet_ID with Outlet_Age in the x-axis labels
+ggplot(sales_with_age, aes(x = Outlet_Identifier, y = Total_Sales)) +
+  geom_bar(stat = "identity", fill = "cornflowerblue") +
+  scale_y_continuous(labels = scales::comma) +
+  labs(title = "Total Sales by Outlet ID with Age Labels",
+       x = "Outlet ID (Age)",
+       y = "Total Sales") +
+  scale_x_discrete(labels = paste(sales_with_age$Outlet_Identifier, "\n(Age:", sales_with_age$Outlet_Age, "yrs)")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))  # Adjust text to make it readable
+
+
+```
+####counting number of sales for store perche mi sembra strano
+
+```{r counting number of sales for each store}
+
+# Sum the total sales for each outlet, grouped by Outlet Identifier and include Outlet Age
+sales_summary <- df %>%
+  group_by(Outlet_Identifier, Outlet_Age) %>%
+  summarise(Total_Sales = sum(Item_Outlet_Sales), .groups = 'drop') %>%
+  arrange(desc(Total_Sales))
+
+# Print the summary table with total sales and outlet age
+print(sales_summary)
 ```
