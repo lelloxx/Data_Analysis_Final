@@ -517,6 +517,18 @@ ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
   theme_minimal()  # Clean minimalistic theme
 ```
 
+```{r sales by outlet id}
+# Create a bar plot of sales by outlet
+ggplot(sales_by_outlet, aes(x = Outlet_Identifier, y = Total_Sales, fill = Outlet_Identifier)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Sales by Outlet", x = "Outlet ID", y = "Total Sales") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
+```
+
+
+
+
 ```{R item visibility vs item mrp line graph}
 # Create bins for Item MRP using a reasonable interval
 df$MRP_Bin <- cut(df$Item_MRP, breaks=seq(from=min(df$Item_MRP), to=max(df$Item_MRP), by=20), include.lowest=TRUE, right=TRUE)
@@ -570,6 +582,9 @@ ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Outlet_Type))
   facet_wrap(~ Outlet_Type) +
   labs(title = "Item Visibility vs Outlet Sales by Outlet Type", x = "Item Visibility", y = "Outlet Sales")
 ```
+
+Nei grocery store l'item visibility non influisce sul numero di vendite perchè gia sai cosa vai a prendere
+
 ###Checking for Outliers
 
 ```{r plots to see outliers}
@@ -653,6 +668,8 @@ ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales, color = Outlet_Type)) +
   facet_wrap(~Outlet_Type) +
   labs(title = "Impact of MRP and Outlet Type on Sales")
 ```
+
+
 ## Visualization Interpretation
 
 The scatter plots across different outlet types (Grocery Store, Supermarket Type1, Type2, and Type3) show how Item_MRP influences sales:
@@ -689,6 +706,25 @@ These insights can help BigMart tailor its pricing strategies according to the t
 
 
 
+
+```{r Impact of item MRP ad Outlet Type on Sales }
+# Adjusting the model to focus only on Item Visibility
+model_visibility <- lm(Item_Outlet_Sales ~ Item_Visibility, data = df)
+summary(model_visibility)
+# Plotting the relationship between Item Visibility and Sales
+ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.3) +  # Point opacity reduced for better visualization of density
+  geom_smooth(method = "lm", se = FALSE) +  # Linear model smoothing without confidence intervals
+  labs(title = "Impact of Item Visibility on Sales",  # Updated title
+       x = "Item Visibility",  # X-axis label
+       y = "Sales")  # Y-axis label
+
+```
+
+Dobbiamo scriveree interprertazione di questo grafico
+
+
+
 #Feature Engineering
 ```{r feature engineering}
 df <- df %>%
@@ -716,18 +752,42 @@ df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
 df$Item_Type_Simplified <- as.factor(df$Item_Type_Simplified)
 df$Outlet_Identifier <- as.factor(df$Outlet_Identifier)
 ```
+trasformare da anno di nascita ad età
+
+trasformare in percentuale item visibility.
+
+
+Modelli di previsione su:
+
+  -item rmp
+  -outlet size(?) o type
+  -Percentage of visibility
+  -Outlet id
+  
+  
+poi una volta fatto questo, scegliamo quali variabili sono più influenti e le buttiamo nel modello finale
+
+e poi ragioniamo su come fare il modello finale
+
+
+
 
 Feature Selection with Stepwise Regression
 
-```{r feature selection with stepwise regression}
-library(MASS)
+#```{r feature selection with stepwise regression}
+#library(MASS)
 
 # Set up the full model with all predictors
-full_model <- lm(Item_Outlet_Sales ~ ., data = df)
+# Remove rows with any missing values in the dataset
+#df_clean <- na.omit(df)
+
+# Check the dimensions to see how many rows are left
+#dim(df_clean)
+#full_model <- lm(Item_Outlet_Sales ~ ., data = df_clean)
 
 # Perform stepwise regression based on AIC
-stepwise_model <- stepAIC(full_model, direction = "both")
-summary(stepwise_model)
-final_formula <- formula(stepwise_model)
+#stepwise_model <- stepAIC(full_model, direction = "both")
+#summary(stepwise_model)
+#final_formula <- formula(stepwise_model)
 
 ```
