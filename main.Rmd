@@ -6,6 +6,14 @@ date: "2024-06-10"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(Metrics)
+library(glmnet)
+library(mgcv)
+library(rpart)
+library(e1071)
+library(splines)
+library(MASS)
 ```
 
 Importing dataset and libraries
@@ -14,7 +22,7 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(l,header=TRUE, sep=",") 
+df= read.table(a,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -102,22 +110,8 @@ print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", perce
 
 
 
-```{r Outlet size analisy 2}
-#conteggio records senza Outlet_Size:
-null<-sum(nchar(df$Outlet_Size) ==0)
 
-#numero di records
-total<- nrow(df)
 
-print(paste("Number of rows with missing valuess on Outlet_Size:",null))
-
-#percentuale di righe senza outlet_size
-percentuale_stringhe_vuote <- (null / total) * 100
-
-#stampa percentuale di righe senza outlet_size
-
-print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
-```
 
 ```{r updating outlet_size}
 # Aggiornamento della colonna 'Outlet_Size'
@@ -139,6 +133,26 @@ outlet_summary <- df %>%
 print(outlet_summary)
 
 ```
+
+```{r Outlet size analisy 2}
+#conteggio records senza Outlet_Size:
+null<-sum(nchar(df$Outlet_Size) ==0)
+
+#numero di records
+total<- nrow(df)
+
+print(paste("Number of rows with missing valuess on Outlet_Size:",null))
+
+#percentuale di righe senza outlet_size
+percentuale_stringhe_vuote <- (null / total) * 100
+
+#stampa percentuale di righe senza outlet_size
+
+print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
+```
+
+
+
 
 ```{r adding na values}
 # Aggiornamento della colonna 'Outlet_Size' per riempire le stringhe vuote
@@ -230,7 +244,7 @@ names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
 print(zero_visibility_counts)
 ```
 
-```{r count Visibility for each store}
+```{r count Visibility for each store 2}
 
 visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
 names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
@@ -240,7 +254,6 @@ print(visibility_sum_per_store)
 ```
 
 ```{r Visibility}
-# Caricare il dataset
 
 # Filtrare i record con visibilità maggiore di zero per calcolare le medie
 filtered_df <- df[df$Item_Visibility > 0, ]
@@ -264,10 +277,55 @@ df <- df[, !names(df) %in% c("Item_Visibility.new", "key")]
 # Visualizzare il dataframe aggiornato
 head(df)
 ```
-```{r dropping useless columns}
+```{r dropping useless }
 df <- df %>%
   select(-Item_Type.new, -Outlet_Size.new)
 ```
+Finally we fixed the missing values for `Item_Visibility`. To do it we firstly count the number of missing values for each of the 10 shops and their visibility to understand how much visibility we are missing from each store. Our first idea was to subtract each visibility percentage from 100% and then equally divide the remaining visibility among the number of missing visibility product. In doing that we obtained biased and not consistent data because:
+
+1. The filled visibility in each product was too high compared to the non-zeros values
+2. After adding again all the visibility the result was 100% for each shop, but could also be true that in some shops some products are out of stock so the final visibility could be less than 100%
+
+For this reason we decided to change our strategy and to fill the missing values we firstly find the missing `Item_Visibility`, then through the `Item_ID` we find all the shops that have for that product a real value, then we check the `Outlet_Size` of each shop and compare to the one of the market with missing value if it's the same we compute the mean throu all the visibility that match these criteria.
+
+We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
+
+
+```{r unique categories of "Item_Type"}
+#finding out all the uniques
+
+
+item_fat_content_uniques <- unique(df$Item_Type)#unique values of item_fat_content
+
+print(item_fat_content_uniques)
+```
+
+```{r categories reduction of "Item_Type"}
+df <- df %>%
+  mutate(Item_Type_Reduced = case_when(
+    Item_Type %in% c("Baking Goods", "Breads", "Breakfast", "Dairy", "Meat", "Seafood") ~ "Food Basics",
+    Item_Type %in% c("Canned", "Frozen Foods", "Snack Foods", "Starchy Foods") ~ "Processed Foods",
+    Item_Type %in% c("Hard Drinks", "Soft Drinks") ~ "Beverages",
+    Item_Type %in% c("Health and Hygiene", "Household") ~ "Non-Food Items",
+    Item_Type == "Fruits and Vegetables" ~ "Produce",
+    Item_Type == "Others" ~ "Others",
+    TRUE ~ "Others"  # Catch-all for any undefined categories
+  ))
+
+#rename the column item_type_reduced into item_type
+
+#drop old item_Type column
+
+df <- df %>%
+  select(-Item_Type)
+
+
+# Renaming the column using dplyr
+df <- df %>%
+  rename(Item_Type = Item_Type_Reduced)
+```
+
+
 
 
 ```{r visibility plot}
@@ -306,6 +364,7 @@ names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
 # Display the result
 print(visibility_sum_per_store)
 ```
+
 
 ##Multivariate Analysis
 
@@ -529,14 +588,7 @@ ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
   theme_minimal()  # Clean minimalistic theme
 ```
 
-```{r sales by outlet id}
-# Create a bar plot of sales by outlet
-ggplot(sales_by_outlet, aes(x = Outlet_Identifier, y = Total_Sales, fill = Outlet_Identifier)) +
-  geom_bar(stat = "identity") +
-  labs(title = "Total Sales by Outlet", x = "Outlet ID", y = "Total Sales") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))  # Rotate x-axis labels for readability
-```
+
 
 
 
@@ -668,8 +720,33 @@ print(p8)
 
 ```
 
+
+```{r Item type vs Item_Sales}
+
+# Esegui ANOVA
+avg_sales_by_type <- df %>%
+  group_by(Item_Type) %>%
+  summarise(Average_Sales = mean(Item_Outlet_Sales, na.rm = TRUE))
+
+# Creating a bar graph of average sales by item type
+ggplot(avg_sales_by_type, aes(x = Item_Type, y = Average_Sales, fill = Item_Type)) +
+  geom_bar(stat = "identity", width = 0.7) +  # Using identity to use the heights of the bars to represent values in the data
+  labs(title = "Average Sales by Item Type", x = "Item Type", y = "Average Sales") +
+  theme_minimal() +  # Clean minimalistic theme
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate x labels for better visibility
+        legend.title = element_blank()) +  # Remove legend title if not needed
+  scale_fill_brewer(palette = "Paired")  # Optional: Use a color palette that is visually appealing
+
+```
+There are not effective evidences of difference in item_sales based on item_type
+
+
+
+
+
+
 # Lower Dimensional Models
-```{r Impact of item MRP ad Outlet Type on Sales }
+```{r Impact of item MRP ad Outlet Type on Sales 2 }
 model_mrp_outlet <- lm(Item_Outlet_Sales ~ Item_MRP * Outlet_Type, data = df)
 summary(model_mrp_outlet)
 
@@ -746,9 +823,7 @@ df <- df %>%
     
     # Interaction between MRP and Outlet Type
     MRP_x_OutletType = Item_MRP * as.numeric(as.factor(Outlet_Type)),
-    
-    # Visibility scaled
-    Visibility_Scaled = sqrt(Item_Visibility),
+
     
     # Simplifying Item Type
     Item_Type_Simplified = case_when(
@@ -763,7 +838,12 @@ df$Outlet_Type <- as.factor(df$Outlet_Type)
 df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
 df$Item_Type_Simplified <- as.factor(df$Item_Type_Simplified)
 df$Outlet_Identifier <- as.factor(df$Outlet_Identifier)
+
+df <- df %>%
+  select(-c(Outlet_Age, MRP_x_OutletType))
 ```
+
+
 trasformare da anno di nascita ad età
 
 trasformare in percentuale item visibility.
@@ -786,22 +866,6 @@ e poi ragioniamo su come fare il modello finale
 
 Feature Selection with Stepwise Regression
 
-#```{r feature selection with stepwise regression}
-#library(MASS)
-
-# Set up the full model with all predictors
-# Remove rows with any missing values in the dataset
-#df_clean <- na.omit(df)
-
-# Check the dimensions to see how many rows are left
-#dim(df_clean)
-#full_model <- lm(Item_Outlet_Sales ~ ., data = df_clean)
-
-# Perform stepwise regression based on AIC
-#stepwise_model <- stepAIC(full_model, direction = "both")
-#summary(stepwise_model)
-#final_formula <- formula(stepwise_model)
-#```
 
 
 ```{r calculating Outlet Age}
@@ -854,4 +918,507 @@ sales_summary <- df %>%
 
 # Print the summary table with total sales and outlet age
 print(sales_summary)
+```
+
+```{R one hot econding}
+# Identificazione delle variabili categoriche per l'encoding
+categorical_vars <- c("Outlet_Type", "Item_Type_Simplified")
+
+# Applicazione del one-hot encoding
+dummies <- dummyVars(~ Outlet_Type + Item_Type_Simplified, data = df, fullRank = FALSE)
+combined_data_ohe <- predict(dummies, newdata = df)
+
+# Conversione in dataframe
+combined_data_ohe <- as.data.frame(combined_data_ohe)
+
+# Rimozione delle variabili categoriche originali e la colonna "Item_Type"
+df <- df %>%
+  select(-one_of(categorical_vars), -Item_Type) %>%
+  bind_cols(combined_data_ohe)
+
+```
+
+
+Modelli di previsione su:
+
+  -item rmp
+  -outlet size(?) o type
+  -Percentage of visibility
+  -Outlet id
+
+
+Ora dobbiamo creare dei lower-level model per vedere quali variabili utilizzare nel nostro dataset finale, intuitivamente abbiamo pensato che item rmp, outlet size, item visibility e outlet_id possano essere dei buoni indicatori.
+
+Per fare ciò, proviamo a predicare la nostra variabile target Item_Sales con queste 4 tramite GBM, possiamo usare gbm perchè avendo poche va
+
+Non possiamo usare outlet_ID perchè:
+
+non possiamo trasformarlo in numerico in quanto i valori non seguono un ordin
+-I record unici sono solamente 10 quindi il modello avrebbe errori
+
+Possiaom però sostituire Outlet_ID con un'altra variabile ad esempio "Outlet_Age", per vedere se il numero di anni da cui è aperto un negozio inlfuisce su quanto venda un determinato prodotto.
+
+
+
+prima di tutto però dobbiamo dividere in test set e train set il nostro modello, useremo 80% in train ed il 20% in test
+
+Poiche non si possono eseguire lm se delle variabili hanno missing values, andremo a rimuovere i missing value/NA rimasti fino ad ora in modo tale da skippare le righe contenenti.
+
+```{R splitting set}
+library(caret)
+
+# Impostazione del seed per la riproducibilità
+set.seed(123)
+
+# Divisione del dataset in set di training e test
+index <- createDataPartition(df$Item_Outlet_Sales, p = 0.8, list = FALSE)
+train_data <- df[index, ]
+test_data <- df[-index, ]
+```
+
+
+Ora andremo ad eseguire i 4 modelli sul train set
+
+
+```{R model on the train set}
+# Carico le librerie necessarie, se non già caricato
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+
+# Assumo che il tuo dataframe si chiami train_data
+
+# Modello per Item_MRP
+train_data_MRP <- na.omit(train_data[, c("Item_MRP", "Item_Outlet_Sales")])  # Omette NA solo nelle colonne specificate
+model_Item_MRP <- lm(Item_Outlet_Sales ~ Item_MRP, data = train_data_MRP)
+
+# Modello per Outlet_Size
+train_data_Size <- na.omit(train_data[, c("Outlet_Size", "Item_Outlet_Sales")])
+model_Outlet_Size <- lm(Item_Outlet_Sales ~ Outlet_Size, data = train_data_Size)
+
+# Modello per Item_Visibility
+train_data_Visibility <- na.omit(train_data[, c("Item_Visibility", "Item_Outlet_Sales")])
+model_Item_Visibility <- lm(Item_Outlet_Sales ~ Item_Visibility, data = train_data_Visibility)
+
+# Modello per Outlet_Age
+train_data_Age <- na.omit(train_data[, c("Outlet_Age", "Item_Outlet_Sales")])
+model_Outlet_Age <- lm(Item_Outlet_Sales ~ Outlet_Age, data = train_data_Age)
+
+# Stampa i riepiloghi dei modelli
+cat("\nRiepilogo del modello per Item MRP:\n")
+print(summary(model_Item_MRP))
+
+cat("\nRiepilogo del modello per Outlet Size:\n")
+print(summary(model_Outlet_Size))
+
+cat("\nRiepilogo del modello per Item Visibility:\n")
+print(summary(model_Item_Visibility))
+
+cat("\nRiepilogo del modello per Outlet Age:\n")
+print(summary(model_Outlet_Age))
+
+```
+
+```{R model on the test set}
+# Assumo che il tuo dataframe si chiami test_data
+
+# Modello per Item_MRP sul test set
+test_data_MRP <- na.omit(test_data[, c("Item_MRP", "Item_Outlet_Sales")])
+predictions_MRP <- predict(model_Item_MRP, newdata = test_data_MRP)
+
+# Modello per Outlet_Size sul test set
+test_data_Size <- na.omit(test_data[, c("Outlet_Size", "Item_Outlet_Sales")])
+predictions_Size <- predict(model_Outlet_Size, newdata = test_data_Size)
+
+# Modello per Item_Visibility sul test set
+test_data_Visibility <- na.omit(test_data[, c("Item_Visibility", "Item_Outlet_Sales")])
+predictions_Visibility <- predict(model_Item_Visibility, newdata = test_data_Visibility)
+
+# Modello per Outlet_Age sul test set
+test_data_Age <- na.omit(test_data[, c("Outlet_Age", "Item_Outlet_Sales")])
+predictions_Age <- predict(model_Outlet_Age, newdata = test_data_Age)
+
+# Calcolo delle metriche di performance (RMSE e R-squared) per ogni modello
+library(Metrics)
+
+# RMSE
+rmse_MRP <- rmse(test_data_MRP$Item_Outlet_Sales, predictions_MRP)
+rmse_Size <- rmse(test_data_Size$Item_Outlet_Sales, predictions_Size)
+rmse_Visibility <- rmse(test_data_Visibility$Item_Outlet_Sales, predictions_Visibility)
+rmse_Age <- rmse(test_data_Age$Item_Outlet_Sales, predictions_Age)
+
+# R-squared
+r2_MRP <- summary(lm(Item_Outlet_Sales ~ predictions_MRP, data = test_data_MRP))$r.squared
+r2_Size <- summary(lm(Item_Outlet_Sales ~ predictions_Size, data = test_data_Size))$r.squared
+r2_Visibility <- summary(lm(Item_Outlet_Sales ~ predictions_Visibility, data = test_data_Visibility))$r.squared
+r2_Age <- summary(lm(Item_Outlet_Sales ~ predictions_Age, data = test_data_Age))$r.squared
+
+# Stampa dei risultati
+print("Performance Metrics for Each Variable on the Test Set:")
+print(data.frame(
+  Variable = c("Item_MRP", "Outlet_Size", "Item_Visibility", "Outlet_Age"),
+  RMSE = c(rmse_MRP, rmse_Size, rmse_Visibility, rmse_Age),
+  R_Squared = c(r2_MRP, r2_Size, r2_Visibility, r2_Age)
+))
+
+```
+scrivi il chunk in cui vengono comparate le performance del test e del train.
+
+
+
+
+	•	Item_MRP è la variabile più predittiva tra quelle considerate, spiegando circa il 30% della varianza nelle vendite. Questa variabile potrebbe essere utile nel modello finale.
+	•	Outlet_Size ha una capacità predittiva molto bassa ma potrebbe ancora fornire qualche informazione utile in un modello multivariato.
+	•	Item_Visibility e Outlet_Age hanno una capacità predittiva trascurabile e probabilmente non aggiungono valore significativo a un modello predittivo delle vendite se usate da sole.
+
+
+
+Selezione del miglior modello con la stepwise regression
+
+
+```{R stepwise regression}
+if (!require(caret)) install.packages("caret")
+if (!require(MASS)) install.packages("MASS")
+library(caret)
+library(MASS)
+
+# Identificazione e rimozione delle variabili categoriche
+train_data <- train_data[, sapply(train_data, is.numeric)]
+test_data <- test_data[, sapply(test_data, is.numeric)]
+test_data <- na.omit(test_data)  # Rimuove tutte le righe con NA
+train_data <- na.omit(train_data)
+# Modello iniziale con le variabili numeriche rimanenti
+fit_initial <- lm(Item_Outlet_Sales ~ ., data = train_data)
+
+# Selezione delle variabili usando il metodo backward
+step_model <- stepAIC(fit_initial, direction = "backward", trace = FALSE)
+
+# Stampa del modello finale dopo la selezione backward
+print(summary(step_model))
+
+# Previsione sul test set utilizzando il modello selezionato
+predictions <- predict(step_model, newdata = test_data)
+
+# Calcolo delle metriche di performance sul test set
+actuals <- test_data$Item_Outlet_Sales
+rmse_value <- sqrt(mean((predictions - actuals)^2))
+r_squared <- summary(lm(actuals ~ predictions))$r.squared
+
+# Stampa delle metriche di performance
+cat("Performance Metrics on Test Set:\n")
+cat("RMSE:", rmse_value, "\n")
+cat("R-squared:", r_squared, "\n")
+
+# Puoi anche desiderare di vedere come il modello si comporta sul set di training per confronto
+train_predictions <- predict(step_model, newdata = train_data)
+train_actuals <- train_data$Item_Outlet_Sales
+train_rmse <- sqrt(mean((train_predictions - train_actuals)^2))
+train_r_squared <- summary(lm(train_actuals ~ train_predictions))$r.squared
+
+# Stampa delle metriche di performance sul train set
+cat("Performance Metrics on Train Set:\n")
+cat("RMSE:", train_rmse, "\n")
+cat("R-squared:", train_r_squared, "\n")
+
+```
+
+## Ridge Regression
+```{R Ridge }
+if (!require(glmnet)) install.packages("glmnet")
+library(glmnet)
+# Preparazione dei dati
+x_train <- model.matrix(Item_Outlet_Sales ~ . - 1, data = train_data)
+y_train <- train_data$Item_Outlet_Sales
+
+x_test <- model.matrix(Item_Outlet_Sales ~ . - 1, data = test_data)
+y_test <- test_data$Item_Outlet_Sales
+# Modello Ridge
+set.seed(123)
+ridge_model <- cv.glmnet(x_train, y_train, alpha = 0, lambda = 10^seq(10, -2, length = 100))
+best_lambda_ridge <- ridge_model$lambda.min
+
+# Previsione sul test set
+ridge_predictions <- predict(ridge_model, s = best_lambda_ridge, newx = x_test)
+
+# Calcolo delle metriche di performance
+ridge_rmse <- sqrt(mean((ridge_predictions - y_test)^2))
+ridge_r_squared <- summary(lm(y_test ~ ridge_predictions))$r.squared
+
+cat("Ridge Regression Performance Metrics:\n")
+cat("RMSE:", ridge_rmse, "\n")
+cat("R-squared:", ridge_r_squared, "\n")
+```
+## Lasso Regression
+```{R Lasso Regression}
+# Modello Lasso
+set.seed(123)
+lasso_model <- cv.glmnet(x_train, y_train, alpha = 1, lambda = 10^seq(10, -2, length = 100))
+best_lambda_lasso <- lasso_model$lambda.min
+
+# Previsione sul test set
+lasso_predictions <- predict(lasso_model, s = best_lambda_lasso, newx = x_test)
+
+# Calcolo delle metriche di performance
+lasso_rmse <- sqrt(mean((lasso_predictions - y_test)^2))
+lasso_r_squared <- summary(lm(y_test ~ lasso_predictions))$r.squared
+
+cat("Lasso Regression Performance Metrics:\n")
+cat("RMSE:", lasso_rmse, "\n")
+cat("R-squared:", lasso_r_squared, "\n")
+```
+##Elastic Net
+
+```{R elastic net}
+set.seed(123)
+elastic_net_model <- cv.glmnet(x_train, y_train, alpha = 0.5, lambda = 10^seq(10, -2, length = 100))
+best_lambda_elastic_net <- elastic_net_model$lambda.min
+
+# Previsione sul test set
+elastic_net_predictions <- predict(elastic_net_model, s = best_lambda_elastic_net, newx = x_test)
+
+# Calcolo delle metriche di performance
+elastic_net_rmse <- sqrt(mean((elastic_net_predictions - y_test)^2))
+elastic_net_r_squared <- summary(lm(y_test ~ elastic_net_predictions))$r.squared
+
+cat("Elastic Net Performance Metrics:\n")
+cat("RMSE:", elastic_net_rmse, "\n")
+cat("R-squared:", elastic_net_r_squared, "\n")
+```
+
+
+Il valore R-squared per ogni metodo utilizzato è di circa 0.57, ora abbiamo più modi di procedere (li faremo tutti):
+
+1. Stacking dei diversi metodi utilizzati fino ad ora
+2. Ulteriore feature engineering
+3. Modelli non lineari come il gadient boosting machines
+4. Hyperparameter Tuning
+5. La cross-validation
+
+```{R ensembling / stacking}
+set.seed(123)
+x_train <- model.matrix(Item_Outlet_Sales ~ . - 1, data = train_data)
+y_train <- train_data$Item_Outlet_Sales
+
+x_test <- model.matrix(Item_Outlet_Sales ~ . - 1, data = test_data)
+y_test <- test_data$Item_Outlet_Sales
+# Modello Ridge
+ridge_model <- cv.glmnet(x_train, y_train, alpha = 0, lambda = 10^seq(10, -2, length = 100))
+ridge_predictions_train <- predict(ridge_model, s = ridge_model$lambda.min, newx = x_train)
+ridge_predictions_test <- predict(ridge_model, s = ridge_model$lambda.min, newx = x_test)
+
+# Modello Lasso
+lasso_model <- cv.glmnet(x_train, y_train, alpha = 1, lambda = 10^seq(10, -2, length = 100))
+lasso_predictions_train <- predict(lasso_model, s = lasso_model$lambda.min, newx = x_train)
+lasso_predictions_test <- predict(lasso_model, s = lasso_model$lambda.min, newx = x_test)
+
+# Modello Elastic Net
+elastic_net_model <- cv.glmnet(x_train, y_train, alpha = 0.5, lambda = 10^seq(10, -2, length = 100))
+elastic_net_predictions_train <- predict(elastic_net_model, s = elastic_net_model$lambda.min, newx = x_train)
+elastic_net_predictions_test <- predict(elastic_net_model, s = elastic_net_model$lambda.min, newx = x_test)
+# Combinare le previsioni dei modelli base per il set di allenamento
+stacked_predictions_train <- data.frame(
+  Ridge = ridge_predictions_train,
+  Lasso = lasso_predictions_train,
+  ElasticNet = elastic_net_predictions_train
+)
+
+# Combinare le previsioni dei modelli base per il set di test
+stacked_predictions_test <- data.frame(
+  Ridge = ridge_predictions_test,
+  Lasso = lasso_predictions_test,
+  ElasticNet = elastic_net_predictions_test
+)
+# Addestrare il meta-learner (regressione lineare)
+meta_learner <- lm(y_train ~ ., data = stacked_predictions_train)
+
+# Previsioni del meta-learner sul set di test
+meta_predictions_test <- predict(meta_learner, newdata = stacked_predictions_test)
+
+# Calcolo delle metriche di performance
+meta_rmse <- sqrt(mean((meta_predictions_test - y_test)^2))
+meta_r_squared <- summary(lm(y_test ~ meta_predictions_test))$r.squared
+
+cat("Stacking Performance Metrics:\n")
+cat("RMSE:", meta_rmse, "\n")
+cat("R-squared:", meta_r_squared, "\n")
+```
+head(df)
+
+visto che anche con lo stacking la performance è simile, andiamo ad aggiungere delle nuove feature.
+
+```{R feature engineering}
+
+# Creazione della variabile Price_Per_Unit_Weight
+df$Price_Per_Unit_Weight <- ifelse(is.na(df$Item_Weight), 0, df$Item_MRP / df$Item_Weight)
+
+
+# Creazione della variabile logaritmica per Item_Visibility
+df$Log_Item_Visibility <- log(df$Item_Visibility + 1)
+
+# Verifica delle prime righe del dataset per controllare le nuove variabili
+head(df)
+sum(is.na(df$Item_MRP))
+sum(is.na(df$Outlet_Size))
+df <- na.omit(df, cols = "Outlet_Size")
+df <- df %>%
+  filter_all(all_vars(!(is.character(.) & . == "")))
+df$Outlet_Size <- as.numeric((df$Outlet_Size))
+
+df$MRP_x_Outlet_Size <- df$Item_MRP * df$Outlet_Size
+
+
+```
+
+
+
+
+
+
+
+
+
+```{R stepwise regression}
+if (!require(caret)) install.packages("caret")
+if (!require(MASS)) install.packages("MASS")
+library(caret)
+library(MASS)
+
+# Identificazione e rimozione delle variabili categoriche
+train_data <- train_data[, sapply(train_data, is.numeric)]
+test_data <- test_data[, sapply(test_data, is.numeric)]
+test_data <- na.omit(test_data)  # Rimuove tutte le righe con NA
+train_data <- na.omit(train_data)
+# Modello iniziale con le variabili numeriche rimanenti
+fit_initial <- lm(Item_Outlet_Sales ~ ., data = train_data)
+
+# Selezione delle variabili usando il metodo backward
+step_model <- stepAIC(fit_initial, direction = "backward", trace = FALSE)
+
+# Stampa del modello finale dopo la selezione backward
+print(summary(step_model))
+
+# Previsione sul test set utilizzando il modello selezionato
+predictions <- predict(step_model, newdata = test_data)
+
+# Calcolo delle metriche di performance sul test set
+actuals <- test_data$Item_Outlet_Sales
+rmse_value <- sqrt(mean((predictions - actuals)^2))
+r_squared <- summary(lm(actuals ~ predictions))$r.squared
+
+# Stampa delle metriche di performance
+cat("Performance Metrics on Test Set:\n")
+cat("RMSE:", rmse_value, "\n")
+cat("R-squared:", r_squared, "\n")
+
+# Puoi anche desiderare di vedere come il modello si comporta sul set di training per confronto
+train_predictions <- predict(step_model, newdata = train_data)
+train_actuals <- train_data$Item_Outlet_Sales
+train_rmse <- sqrt(mean((train_predictions - train_actuals)^2))
+train_r_squared <- summary(lm(train_actuals ~ train_predictions))$r.squared
+
+# Stampa delle metriche di performance sul train set
+cat("Performance Metrics on Train Set:\n")
+cat("RMSE:", train_rmse, "\n")
+cat("R-squared:", train_r_squared, "\n")
+
+```
+
+
+
+
+```{R XGBoost}
+library(xgboost)
+
+# Prepara i dati per XGBoost
+dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = train_data_selected$Item_Outlet_Sales)
+dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(test_data_selected) == "Item_Outlet_Sales")]), label = test_data_selected$Item_Outlet_Sales)
+
+# Imposta i parametri del modello XGBoost
+params <- list(
+  objective = "reg:squarederror",
+  eval_metric = "rmse"
+)
+
+# Addestra il modello
+xgb_model <- xgb.train(params, dtrain, nrounds = 100)
+
+# Previsioni sul set di test
+xgb_predictions_test <- predict(xgb_model, dtest)
+
+# Calcola le metriche di performance
+xgb_rmse <- sqrt(mean((xgb_predictions_test - test_data_selected$Item_Outlet_Sales)^2))
+xgb_r_squared <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_test))$r.squared
+
+cat("XGBoost Performance Metrics on Test Set:\n")
+cat("RMSE:", xgb_rmse, "\n")
+cat("R-squared:", xgb_r_squared, "\n")
+```
+
+ottimizziamo i parametri del xgboost
+
+```{R Parameter Tuning}
+library(caret)
+library(xgboost)
+
+# Definisci la griglia dei parametri
+xgb_grid <- expand.grid(
+  nrounds = seq(50, 200, by = 50),
+  max_depth = seq(3, 10, by = 2),
+  eta = c(0.01, 0.1, 0.3),
+  gamma = c(0, 1, 5),
+  colsample_bytree = c(0.5, 0.7, 1),
+  min_child_weight = c(1, 5, 10),
+  subsample = c(0.5, 0.7, 1)
+)
+
+# Definisci il controllo della cross-validation
+train_control <- trainControl(
+  method = "cv",
+  number = 5,
+  verboseIter = TRUE,
+  allowParallel = TRUE
+)
+
+# Esegui la ricerca a griglia
+xgb_tune <- train(
+  x = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]),
+  y = train_data_selected$Item_Outlet_Sales,
+  method = "xgbTree",
+  trControl = train_control,
+  tuneGrid = xgb_grid,
+  metric = "RMSE"
+)
+
+# Migliori parametri
+best_params <- xgb_tune$bestTune
+print(best_params)
+
+# Addestra il modello finale con i migliori parametri
+dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = train_data_selected$Item_Outlet_Sales)
+dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = test_data_selected$Item_Outlet_Sales)
+
+xgb_model_final <- xgb.train(
+  params = list(
+    objective = "reg:squarederror",
+    max_depth = best_params$max_depth,
+    eta = best_params$eta,
+    gamma = best_params$gamma,
+    colsample_bytree = best_params$colsample_bytree,
+    min_child_weight = best_params$min_child_weight,
+    subsample = best_params$subsample
+  ),
+  data = dtrain,
+  nrounds = best_params$nrounds
+)
+
+# Previsioni sul set di test
+xgb_predictions_final <- predict(xgb_model_final, dtest)
+
+# Calcola le metriche di performance
+xgb_rmse_final <- sqrt(mean((xgb_predictions_final - test_data_selected$Item_Outlet_Sales)^2))
+xgb_r_squared_final <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_final))$r.squared
+
+cat("XGBoost Performance Metrics on Test Set (Optimized):\n")
+cat("RMSE:", xgb_rmse_final, "\n")
+cat("R-squared:", xgb_r_squared_final, "\n")
+
 ```
