@@ -1560,3 +1560,106 @@ cat("RMSE:", xgb_rmse_final, "\n")
 cat("R-squared:", xgb_r_squared_final, "\n")
 
 ```
+Random Forest tree using only selecte
+
+
+
+```{r random forest tree using only selected variables}
+# Install and load the randomForest package
+if (!require(randomForest)) {
+    install.packages("randomForest", dependencies = TRUE)
+}
+library(randomForest)
+
+# Assuming 'train_data' and 'test_data' are your datasets
+# Make sure all categorical variables are converted to factors if they are not already
+
+# Convert factors (Uncomment and adjust as necessary)
+# train_data$Outlet_Type <- as.factor(train_data$Outlet_Type)
+# test_data$Outlet_Type <- as.factor(test_data$Outlet_Type)
+# Additional categorical variables should be handled similarly.
+
+# Prepare data for Random Forest
+train_features <- train_data[, names(train_data) != "Item_Outlet_Sales"]
+train_labels <- train_data$Item_Outlet_Sales
+
+test_features <- test_data[, names(test_data) != "Item_Outlet_Sales"]
+test_labels <- test_data$Item_Outlet_Sales
+
+# Train the Random Forest model
+random_forest_model <- randomForest(x = train_features, y = train_labels, ntree = 200, mtry = 7, importance = TRUE)#mtry da 3 a 18, cambia tree
+
+# Predictions on the test set
+rf_predictions <- predict(random_forest_model, newdata = test_features)
+
+# Calculate RMSE and R-squared
+rf_rmse <- sqrt(mean((rf_predictions - test_labels)^2))
+rf_r_squared <- summary(lm(test_labels ~ rf_predictions))$r.squared
+
+# Print performance metrics
+cat("Random Forest Performance Metrics on Test Set:\n")
+cat("RMSE:", rf_rmse, "\n")
+cat("R-squared:", rf_r_squared, "\n")
+
+# Optionally, print variable importance
+print(importance(random_forest_model), type = 1)  # type = 1 for mean decrease in accuracy
+
+```
+
+```{r random forest tree}
+# Install and load necessary packages
+# Install and load necessary packages
+if (!require("caret")) install.packages("caret", dependencies = TRUE)
+if (!require("ranger")) install.packages("ranger")
+library(caret)
+library(ranger)
+
+# Load your data
+df <- na.omit(df)
+
+# Prepare train and test sets
+set.seed(123)  # For reproducibility
+index <- createDataPartition(df$Item_Outlet_Sales, p = 0.8, list = FALSE)
+train_data <- df[index, ]
+test_data <- df[-index, ]
+
+# Define training control
+train_control <- trainControl(
+  method = "cv",          # Use cross-validation
+  number = 10,            # Number of folds in cross-validation
+  savePredictions = "final",
+  verboseIter = TRUE
+)
+
+# Define the tuning grid
+grid <- expand.grid(
+  mtry = c(2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16,17,18),                  # Number of variables randomly sampled as candidates at each split
+  splitrule = c("variance"),          # Use variance as the split rule for regression
+  min.node.size = c(5, 350)            # Minimum size of terminal nodes
+)
+
+# Train the model using Random Forest via 'ranger' for regression
+model <- train(
+  Item_Outlet_Sales ~ .,             # Regression formula
+  data = train_data,                 # Training data
+  method = "ranger",                 # Use the 'ranger' package
+  trControl = train_control,         # Training control
+  tuneGrid = grid,                   # Grid of hyperparameters
+  metric = "RMSE",                   # Optimization metric for regression
+  maximize = FALSE                   # Minimize the metric (since it's RMSE)
+)
+
+# View the best tuning parameters
+print(model$bestTune)
+
+# View the results of all tuning iterations
+print(model$results)
+
+```
+
+
+
+
+
+
+
