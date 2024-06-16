@@ -22,7 +22,7 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(l,header=TRUE, sep=",") 
+df= read.table(a,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -1111,6 +1111,8 @@ cat("R-squared:", train_r_squared, "\n")
 ```{r Extracting Stepwise Variables}
 # Extracting the names of the variables used in the final stepwise model
 stepwise_variables <- names(coef(step_model))
+stepwise_variables <- c(stepwise_variables, "")
+stepwise_variables <- stepwise_variables[-c(1, length(stepwise_variables))]
 
 # Print the list of variables used in the stepwise regression model
 print(stepwise_variables)
@@ -1146,20 +1148,13 @@ cat("R-squared:", ridge_r_squared, "\n")
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
-# Preparing the data
-# Since 'Outlet_Type' is one-hot encoded, we include the dummy variables directly
-x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+formula <- as.formula(paste("Item_Outlet_Sales ~", paste(stepwise_variables, collapse=" + ")))
 
+# Creating the model matrices
+x_train <- model.matrix(formula, data=train_data)
 y_train <- train_data$Item_Outlet_Sales
 
-x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
-
+x_test <- model.matrix(formula, data=test_data)
 y_test <- test_data$Item_Outlet_Sales
 
 # Ridge Regression Model
@@ -1202,20 +1197,13 @@ cat("R-squared:", lasso_r_squared, "\n")
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
-# Preparing the data
-# Using only the variables selected by stepwise regression
-x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+formula <- as.formula(paste("Item_Outlet_Sales ~", paste(stepwise_variables, collapse=" + "), "- 1"))
 
+# Creating the model matrices
+x_train <- model.matrix(formula, data=train_data)
 y_train <- train_data$Item_Outlet_Sales
 
-x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
-
+x_test <- model.matrix(formula, data=test_data)
 y_test <- test_data$Item_Outlet_Sales
 
 # Lasso Regression Model
@@ -1259,20 +1247,14 @@ cat("R-squared:", elastic_net_r_squared, "\n")
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
-# Preparing the data
-# Using only the variables selected by stepwise regression
-x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+# Using the 'stepwise_variables' list to define the formula for the model matrix
+formula <- as.formula(paste("Item_Outlet_Sales ~", paste(stepwise_variables, collapse=" + "), "- 1"))
 
+# Creating the model matrices
+x_train <- model.matrix(formula, data=train_data)
 y_train <- train_data$Item_Outlet_Sales
 
-x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
-                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
-                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
-                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
-
+x_test <- model.matrix(formula, data=test_data)
 y_test <- test_data$Item_Outlet_Sales
 
 # Elastic Net Model
