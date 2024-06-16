@@ -22,7 +22,7 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(a,header=TRUE, sep=",") 
+df= read.table(l,header=TRUE, sep=",") 
 library(dplyr)
 library(corrplot)
 library(ggplot2)
@@ -38,7 +38,7 @@ duplicates_entire_row <- duplicated(df)
 
 # Count the number of entirely duplicated rows
 num_entire_row_duplicates <- sum(duplicates_entire_row)
-print(paste("Number of entirely duplicated rows:", num_entire_row_duplicates))
+print(paste("Number of duplicated rows:", num_entire_row_duplicates))
 ```
 As we can see there aren’t any duplicates in our data set, so we can proceed to find which columns have missing values
 
@@ -67,6 +67,7 @@ Then we will print the uniques name of the column after the edit to chek if the 
 
 
 ###Checking for Missing Values
+
 ```{r check for missing values}
 
 # Crea una copia del dataframe convertendo tutte le colonne in stringhe
@@ -395,14 +396,6 @@ outlet_size-item visibility
 item_outlet_sales and outlet_size
 item_mrp and item_outlet_sales
 
-```{r item MRP vs Outlet Sales}
-library(ggplot2)
-ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
-  geom_point(alpha = 0.5) +
-  labs(title = "Relationship between Item MRP and Outlet Sales",
-       x = "Item MRP", y = "Outlet Sales")
-```
-
 ```{r item MRP vs Outlet sales with gaps of price }
 # Load necessary libraries
 library(ggplot2)
@@ -426,6 +419,24 @@ for (price in specific_price_points) {
 print(p)
 
 ```
+```{R Relationship between Item MRP and Outlet Sales by Product Type}
+
+library(dplyr)
+
+df_summary <- df %>%
+  group_by(Item_Type, MRP_Bracket = cut(Item_MRP, breaks = seq(0, max(Item_MRP), by = 20))) %>%
+  summarize(Average_Sales = mean(Item_Outlet_Sales), .groups = 'drop')
+
+ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  labs(title = "Average Outlet Sales by MRP Bracket and Product Type",
+       x = "MRP Bracket",
+       y = "Average Outlet Sales") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+zi qua c'è scritto che più vendi e più alzi il prezzo di base
+
 
 ```{R item outlet sales by outlet size}
 ggplot(df, aes(x = Outlet_Size, y = Item_Outlet_Sales)) +
@@ -442,28 +453,6 @@ ggplot(df, aes(x = Outlet_Establishment_Year, y = Item_Outlet_Sales)) +
        x = "Establishment Year", y = "Outlet Sales")
 
 ```
-
-```{R Relationship between Item MRP and Outlet Sales by Product Type}
-
-library(dplyr)
-
-df_summary <- df %>%
-  group_by(Item_Type, MRP_Bracket = cut(Item_MRP, breaks = seq(0, max(Item_MRP), by = 20))) %>%
-  summarize(Average_Sales = mean(Item_Outlet_Sales), .groups = 'drop')
-
-ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Type)) +
-  geom_bar(stat = "identity", position = position_dodge()) +
-  labs(title = "Average Outlet Sales by MRP Bracket and Product Type",
-       x = "MRP Bracket",
-       y = "Average Outlet Sales") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-#ciaociao
-#namoooo
-#prova 3
-```
-
-zi qua c'è scritto che più vendi e più alzi il prezzo di base
 
 ```{R  Item_Outlet_Sales density plot}
 # Create a density plot
@@ -881,7 +870,7 @@ store_ages <- df %>%
   arrange(Outlet_Identifier)  # Optional: Sort by Outlet Identifier for easier reading
 
 # Print the resulting table to see each store's age
-print(store_ages)
+#print(store_ages)
 
 # Aggregate total sales by Outlet_ID
 sales_summary <- df %>%
@@ -1053,7 +1042,6 @@ r2_Visibility <- summary(lm(Item_Outlet_Sales ~ predictions_Visibility, data = t
 r2_Age <- summary(lm(Item_Outlet_Sales ~ predictions_Age, data = test_data_Age))$r.squared
 
 # Stampa dei risultati
-print("Performance Metrics for Each Variable on the Test Set:")
 print(data.frame(
   Variable = c("Item_MRP", "Outlet_Size", "Item_Visibility", "Outlet_Age"),
   RMSE = c(rmse_MRP, rmse_Size, rmse_Visibility, rmse_Age),
@@ -1120,7 +1108,13 @@ cat("RMSE:", train_rmse, "\n")
 cat("R-squared:", train_r_squared, "\n")
 
 ```
+```{r Extracting Stepwise Variables}
+# Extracting the names of the variables used in the final stepwise model
+stepwise_variables <- names(coef(step_model))
 
+# Print the list of variables used in the stepwise regression model
+print(stepwise_variables)
+```
 ## Ridge Regression
 ```{R Ridge }
 if (!require(glmnet)) install.packages("glmnet")
@@ -1147,6 +1141,44 @@ cat("Ridge Regression Performance Metrics:\n")
 cat("RMSE:", ridge_rmse, "\n")
 cat("R-squared:", ridge_r_squared, "\n")
 ```
+
+```{r Ridge using only the variables selected from stepwise}
+if (!require(glmnet)) install.packages("glmnet")
+library(glmnet)
+
+# Preparing the data
+# Since 'Outlet_Type' is one-hot encoded, we include the dummy variables directly
+x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+
+y_train <- train_data$Item_Outlet_Sales
+
+x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
+
+y_test <- test_data$Item_Outlet_Sales
+
+# Ridge Regression Model
+set.seed(123)
+ridge_model <- cv.glmnet(x_train, y_train, alpha = 0, lambda = 10^seq(10, -2, length = 100))
+best_lambda_ridge <- ridge_model$lambda.min
+
+# Prediction on the test set
+ridge_predictions <- predict(ridge_model, s = best_lambda_ridge, newx = x_test)
+
+# Calculate performance metrics
+ridge_rmse <- sqrt(mean((ridge_predictions - y_test)^2))
+ridge_r_squared <- summary(lm(y_test ~ ridge_predictions))$r.squared
+
+cat("Ridge Regression Performance Metrics:\n")
+cat("RMSE:", ridge_rmse, "\n")
+cat("R-squared:", ridge_r_squared, "\n")
+```
+
 ## Lasso Regression
 ```{R Lasso Regression}
 # Modello Lasso
@@ -1165,6 +1197,45 @@ cat("Lasso Regression Performance Metrics:\n")
 cat("RMSE:", lasso_rmse, "\n")
 cat("R-squared:", lasso_r_squared, "\n")
 ```
+
+```{r lasso with only the selected variables by stepwise reg}
+if (!require(glmnet)) install.packages("glmnet")
+library(glmnet)
+
+# Preparing the data
+# Using only the variables selected by stepwise regression
+x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+
+y_train <- train_data$Item_Outlet_Sales
+
+x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
+
+y_test <- test_data$Item_Outlet_Sales
+
+# Lasso Regression Model
+set.seed(123)
+lasso_model <- cv.glmnet(x_train, y_train, alpha = 1, lambda = 10^seq(10, -2, length = 100))
+best_lambda_lasso <- lasso_model$lambda.min
+
+# Prediction on the test set
+lasso_predictions <- predict(lasso_model, s = best_lambda_lasso, newx = x_test)
+
+# Calculate performance metrics
+lasso_rmse <- sqrt(mean((lasso_predictions - y_test)^2))
+lasso_r_squared <- summary(lm(y_test ~ lasso_predictions))$r.squared
+
+cat("Lasso Regression Performance Metrics:\n")
+cat("RMSE:", lasso_rmse, "\n")
+cat("R-squared:", lasso_r_squared, "\n")
+```
+
+
 ##Elastic Net
 
 ```{R elastic net}
@@ -1176,6 +1247,43 @@ best_lambda_elastic_net <- elastic_net_model$lambda.min
 elastic_net_predictions <- predict(elastic_net_model, s = best_lambda_elastic_net, newx = x_test)
 
 # Calcolo delle metriche di performance
+elastic_net_rmse <- sqrt(mean((elastic_net_predictions - y_test)^2))
+elastic_net_r_squared <- summary(lm(y_test ~ elastic_net_predictions))$r.squared
+
+cat("Elastic Net Performance Metrics:\n")
+cat("RMSE:", elastic_net_rmse, "\n")
+cat("R-squared:", elastic_net_r_squared, "\n")
+```
+
+```{r elastic net using only the variables selected by stepwise}
+if (!require(glmnet)) install.packages("glmnet")
+library(glmnet)
+
+# Preparing the data
+# Using only the variables selected by stepwise regression
+x_train <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                           `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                           `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                           I(Item_MRP * Outlet_Size) - 1, data = train_data)
+
+y_train <- train_data$Item_Outlet_Sales
+
+x_test <- model.matrix(Item_Outlet_Sales ~ Item_MRP + Outlet_Establishment_Year + Outlet_Size +
+                          `Outlet_Type.Grocery Store` + `Outlet_Type.Supermarket Type1` +
+                          `Outlet_Type.Supermarket Type2` + `Outlet_Type.Supermarket Type3` + 
+                          I(Item_MRP * Outlet_Size) - 1, data = test_data)
+
+y_test <- test_data$Item_Outlet_Sales
+
+# Elastic Net Model
+set.seed(123)
+elastic_net_model <- cv.glmnet(x_train, y_train, alpha = 0.5, lambda = 10^seq(10, -2, length = 100))
+best_lambda_elastic_net <- elastic_net_model$lambda.min
+
+# Prediction on the test set
+elastic_net_predictions <- predict(elastic_net_model, s = best_lambda_elastic_net, newx = x_test)
+
+# Calculate performance metrics
 elastic_net_rmse <- sqrt(mean((elastic_net_predictions - y_test)^2))
 elastic_net_r_squared <- summary(lm(y_test ~ elastic_net_predictions))$r.squared
 
@@ -1352,7 +1460,55 @@ cat("XGBoost Performance Metrics on Test Set:\n")
 cat("RMSE:", xgb_rmse, "\n")
 cat("R-squared:", xgb_r_squared, "\n")
 ```
+```{r xgboost corrected?}
+library(xgboost)
 
+# Define the selected variables
+selected_vars <- c("Item_MRP", "Outlet_Establishment_Year", "Outlet_Size",
+                   "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                   "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3",
+                   "MRP_x_Outlet_Size", "Item_Outlet_Sales")
+
+# Check to ensure all selected variables are in train_data and test_data
+if (!all(selected_vars %in% names(train_data))) {
+    stop("One or more selected variables not found in train_data")
+}
+if (!all(selected_vars %in% names(test_data))) {
+    stop("One or more selected variables not found in test_data")
+}
+
+# Subset the data
+train_data_selected <- train_data[selected_vars]
+test_data_selected <- test_data[selected_vars]
+
+# Prepare the data for XGBoost
+dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), 
+                      label = train_data_selected$Item_Outlet_Sales)
+dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(test_data_selected) == "Item_Outlet_Sales")]), 
+                     label = test_data_selected$Item_Outlet_Sales)
+
+# Set model parameters for XGBoost
+params <- list(
+  objective = "reg:squarederror",
+  eval_metric = "rmse"
+)
+
+# Train the model
+xgb_model <- xgb.train(params, dtrain, nrounds = 100)
+
+# Predictions on the test set
+xgb_predictions_test <- predict(xgb_model, dtest)
+
+# Calculate performance metrics
+xgb_rmse <- sqrt(mean((xgb_predictions_test - test_data_selected$Item_Outlet_Sales)^2))
+xgb_r_squared <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_test))$r.squared
+
+cat("XGBoost Performance Metrics on Test Set:\n")
+cat("RMSE:", xgb_rmse, "\n")
+cat("R-squared:", xgb_r_squared, "\n")
+
+
+```
 ottimizziamo i parametri del xgboost
 
 ```{R Parameter Tuning}
