@@ -1657,6 +1657,89 @@ print(model$results)
 
 ```
 
+# Clustering
+
+Abbiamo deciso di fare il clustering su item MRP e outlet type per vedere se il mrp cambia in base al tipo di negozio
+
+## Determining optimal number of clusters using the elbow method
+
+qui dobbiamo calculare il punto di elbow che è il punto più basso in cui la curva decresce, quel punto sarà il punto che ci indicherà il numero di clusters da usare
+```{R elbow method}
+
+# Load necessary library
+if (!require("stats")) install.packages("stats")
+library(stats)
+
+#scaliamo la variabile item_MRP
+
+df$Item_MRP <- scale(df$Item_MRP)
+
+# Perform k-means clustering to determine the optimal number of clusters using the Elbow method
+set.seed(123)
+wcss <- sapply(1:10, function(k) {
+  kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")], centers = k, nstart = 25)$tot.withinss
+})
+
+# Plotting the Elbow Curve
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+elbow_plot <- data.frame(k = 1:20, wcss = wcss)
+ggplot(elbow_plot, aes(x = k, y = wcss)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Elbow Method for Determining Optimal k",
+       x = "Number of Clusters k",
+       y = "Total Within-Cluster Sum of Squares (WCSS)") +
+  theme_minimal()
+```
+
+il numero di clusters ideale sembra essere 9, facciamo la silhouette analysis epr confermare:
+
+
+```{R silhouette analysis}
+# K-means con k = 9, riconfermato come ottimale
+optimal_k <- 9
+final_kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                                     "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
+                              centers = optimal_k, nstart = 50)
+
+# Visualizzazione dei cluster finali
+library(ggplot2)
+df$Cluster <- final_kmeans_result$cluster
+ggplot(df, aes(x = factor(Cluster), y = Item_MRP, fill = factor(Cluster))) +
+  geom_boxplot() +
+  labs(title = "Distribution of Item MRP Across Clusters",
+       x = "Cluster",
+       y = "Item MRP") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal()
+```
+```{r k-means clustering}
+# Assuming the elbow point is at k = 4 based on the plot
+optimal_k <- 9
+kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                               "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")], centers = optimal_k, nstart = 25)
+
+# Add cluster labels to the original data
+df$Cluster <- kmeans_result$cluster
+
+# Summary by cluster
+summary <- aggregate(cbind(Item_MRP) ~ Cluster, data = df, FUN = mean)
+print(summary)
+```
+```{r plotting the cluster}
+# Plotting the clusters
+ggplot(df, aes(x = Cluster, y = Item_MRP, color = factor(Cluster))) +
+  geom_jitter(alpha = 0.5) +
+  facet_wrap(~ Cluster) +
+  labs(title = "Cluster of Item MRP across Outlet Types",
+       x = "Cluster",
+       y = "Scaled Item MRP",
+       color = "Cluster") +
+  theme_minimal()
+```
+
 
 
 
