@@ -1415,152 +1415,10 @@ cat("R-squared:", train_r_squared, "\n")
 
 
 
-```{R XGBoost}
-library(xgboost)
-
-# Prepara i dati per XGBoost
-dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = train_data_selected$Item_Outlet_Sales)
-dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(test_data_selected) == "Item_Outlet_Sales")]), label = test_data_selected$Item_Outlet_Sales)
-
-# Imposta i parametri del modello XGBoost
-params <- list(
-  objective = "reg:squarederror",
-  eval_metric = "rmse"
-)
-
-# Addestra il modello
-xgb_model <- xgb.train(params, dtrain, nrounds = 100)
-
-# Previsioni sul set di test
-xgb_predictions_test <- predict(xgb_model, dtest)
-
-# Calcola le metriche di performance
-xgb_rmse <- sqrt(mean((xgb_predictions_test - test_data_selected$Item_Outlet_Sales)^2))
-xgb_r_squared <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_test))$r.squared
-
-cat("XGBoost Performance Metrics on Test Set:\n")
-cat("RMSE:", xgb_rmse, "\n")
-cat("R-squared:", xgb_r_squared, "\n")
-```
-```{r xgboost corrected?}
-library(xgboost)
-
-# Define the selected variables
-selected_vars <- c("Item_MRP", "Outlet_Establishment_Year", "Outlet_Size",
-                   "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
-                   "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3",
-                   "MRP_x_Outlet_Size", "Item_Outlet_Sales")
-
-# Check to ensure all selected variables are in train_data and test_data
-if (!all(selected_vars %in% names(train_data))) {
-    stop("One or more selected variables not found in train_data")
-}
-if (!all(selected_vars %in% names(test_data))) {
-    stop("One or more selected variables not found in test_data")
-}
-
-# Subset the data
-train_data_selected <- train_data[selected_vars]
-test_data_selected <- test_data[selected_vars]
-
-# Prepare the data for XGBoost
-dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), 
-                      label = train_data_selected$Item_Outlet_Sales)
-dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(test_data_selected) == "Item_Outlet_Sales")]), 
-                     label = test_data_selected$Item_Outlet_Sales)
-
-# Set model parameters for XGBoost
-params <- list(
-  objective = "reg:squarederror",
-  eval_metric = "rmse"
-)
-
-# Train the model
-xgb_model <- xgb.train(params, dtrain, nrounds = 100)
-
-# Predictions on the test set
-xgb_predictions_test <- predict(xgb_model, dtest)
-
-# Calculate performance metrics
-xgb_rmse <- sqrt(mean((xgb_predictions_test - test_data_selected$Item_Outlet_Sales)^2))
-xgb_r_squared <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_test))$r.squared
-
-cat("XGBoost Performance Metrics on Test Set:\n")
-cat("RMSE:", xgb_rmse, "\n")
-cat("R-squared:", xgb_r_squared, "\n")
 
 
-```
-ottimizziamo i parametri del xgboost
 
-```{R Parameter Tuning}
-library(caret)
-library(xgboost)
-
-# Definisci la griglia dei parametri
-xgb_grid <- expand.grid(
-  nrounds = seq(50, 200, by = 50),
-  max_depth = seq(3, 10, by = 2),
-  eta = c(0.01, 0.1, 0.3),
-  gamma = c(0, 1, 5),
-  colsample_bytree = c(0.5, 0.7, 1),
-  min_child_weight = c(1, 5, 10),
-  subsample = c(0.5, 0.7, 1)
-)
-
-# Definisci il controllo della cross-validation
-train_control <- trainControl(
-  method = "cv",
-  number = 5,
-  verboseIter = TRUE,
-  allowParallel = TRUE
-)
-
-# Esegui la ricerca a griglia
-xgb_tune <- train(
-  x = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]),
-  y = train_data_selected$Item_Outlet_Sales,
-  method = "xgbTree",
-  trControl = train_control,
-  tuneGrid = xgb_grid,
-  metric = "RMSE"
-)
-
-# Migliori parametri
-best_params <- xgb_tune$bestTune
-print(best_params)
-
-# Addestra il modello finale con i migliori parametri
-dtrain <- xgb.DMatrix(data = as.matrix(train_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = train_data_selected$Item_Outlet_Sales)
-dtest <- xgb.DMatrix(data = as.matrix(test_data_selected[, -which(names(train_data_selected) == "Item_Outlet_Sales")]), label = test_data_selected$Item_Outlet_Sales)
-
-xgb_model_final <- xgb.train(
-  params = list(
-    objective = "reg:squarederror",
-    max_depth = best_params$max_depth,
-    eta = best_params$eta,
-    gamma = best_params$gamma,
-    colsample_bytree = best_params$colsample_bytree,
-    min_child_weight = best_params$min_child_weight,
-    subsample = best_params$subsample
-  ),
-  data = dtrain,
-  nrounds = best_params$nrounds
-)
-
-# Previsioni sul set di test
-xgb_predictions_final <- predict(xgb_model_final, dtest)
-
-# Calcola le metriche di performance
-xgb_rmse_final <- sqrt(mean((xgb_predictions_final - test_data_selected$Item_Outlet_Sales)^2))
-xgb_r_squared_final <- summary(lm(test_data_selected$Item_Outlet_Sales ~ xgb_predictions_final))$r.squared
-
-cat("XGBoost Performance Metrics on Test Set (Optimized):\n")
-cat("RMSE:", xgb_rmse_final, "\n")
-cat("R-squared:", xgb_r_squared_final, "\n")
-
-```
-Random Forest tree using only selecte
+Random Forest tree using only selected
 
 
 
@@ -1606,7 +1464,7 @@ print(importance(random_forest_model), type = 1)  # type = 1 for mean decrease i
 
 ```
 
-```{r random forest tree}
+```{r random forest tree mtry and node size number detection}
 # Install and load necessary packages
 # Install and load necessary packages
 if (!require("caret")) install.packages("caret", dependencies = TRUE)
@@ -1633,9 +1491,9 @@ train_control <- trainControl(
 
 # Define the tuning grid
 grid <- expand.grid(
-  mtry = c(2, 3, 4,5,6,7,8,9,10,11,12,13,14,15,16,17,18),                  # Number of variables randomly sampled as candidates at each split
+  mtry = c(2,18, by=1),                  # Number of variables randomly sampled as candidates at each split
   splitrule = c("variance"),          # Use variance as the split rule for regression
-  min.node.size = c(5, 350)            # Minimum size of terminal nodes
+  min.node.size = c(5, 350, by=20)            # Minimum size of terminal nodes
 )
 
 # Train the model using Random Forest via 'ranger' for regression
@@ -1656,6 +1514,8 @@ print(model$bestTune)
 print(model$results)
 
 ```
+CON NODE SIZE NODE=5 E MTRY = 18 ABBIAMO FINALMENTE TOCCATO IL 0.6 DI RSQUARED NAMOOOO
+
 
 # Clustering
 
@@ -1698,8 +1558,8 @@ il numero di clusters ideale sembra essere 9, facciamo la silhouette analysis ep
 
 
 ```{R silhouette analysis}
-# K-means con k = 9, riconfermato come ottimale
-optimal_k <- 9
+# K-means con k = 9, riconfermto come ottimale
+optimal_k <- 2
 final_kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
                                      "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
                               centers = optimal_k, nstart = 50)
@@ -1716,8 +1576,8 @@ ggplot(df, aes(x = factor(Cluster), y = Item_MRP, fill = factor(Cluster))) +
   theme_minimal()
 ```
 ```{r k-means clustering}
-# Assuming the elbow point is at k = 4 based on the plot
-optimal_k <- 9
+# Assuming the elbow point is at k = 9 based on the plot
+optimal_k <- 2
 kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
                                "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")], centers = optimal_k, nstart = 25)
 
@@ -1741,8 +1601,115 @@ ggplot(df, aes(x = Cluster, y = Item_MRP, color = factor(Cluster))) +
 ```
 
 
+Verifica se certi tipi di prodotti sono più concentrati in uno dei due cluster. Vediamo ancora una volta se i prodotti che vendono di più sono quelli nel cluster 2(high MRP) o 1 (Low MRP). In teoria dovrebbero essere in quelli con l'MRP più alto
 
 
+```{r item outlet sales cluster mrp}
+if (!require("ggplot2")) install.packages("ggplot2", dependencies = TRUE)
+library(ggplot2)
+
+# 1. Statistiche Descrittive per Item_Outlet_Sales per Cluster
+sales_stats <- aggregate(Item_Outlet_Sales ~ Cluster, data = df, FUN = function(x) c(mean = mean(x), sd = sd(x), median = median(x), IQR = IQR(x)))
+print(sales_stats)
+
+# 2. Test di Significatività tra i due Cluster
+# Controlla prima che entrambi i cluster abbiano più di un elemento
+if (any(table(df$cluster) > 1)) {
+    t_test_results <- t.test(Item_Outlet_Sales ~ cluster, data = df)
+    print(t_test_results)
+}
+
+# 3. Visualizzazione con Box Plot
+ggplot(df, aes(x = factor(Cluster), y = Item_Outlet_Sales, fill = factor(Cluster))) +
+  geom_boxplot() +
+  labs(title = "Distribution of Item Outlet Sales Across Clusters",
+       x = "Cluster",
+       y = "Item Outlet Sales",
+       fill = "Cluster") +
+  theme_minimal()
+
+```
+Tesi confermata :)
 
 
+Ora vediamo quali tipi di supermercato rientrano nella fascia che costa tanto e quali nella fascia che costa poco.
 
+Seguendo un'analisi puramente economica, i Grocery Store ed i Supermarket Type 1, dovranno stare nel cluster con i prezzi alti in quanto hanno pochi prodotti e quindi poca concorrenza interna
+
+```{R outlet type vs cluster mrp}
+# Rinomina le colonne rimuovendo gli spazi
+names(df) <- gsub(" ", "", names(df))
+
+# Verifica i nomi delle colonne aggiornati
+print(names(df))
+# Ricrea la variabile Outlet_Type dal one-hot encoding
+df$Outlet_Type <- ifelse(df$Outlet_Type.GroceryStore == 1, "Grocery Store",
+                         ifelse(df$Outlet_Type.SupermarketType1 == 1, "Supermarket Type1",
+                         ifelse(df$Outlet_Type.SupermarketType2 == 1, "Supermarket Type2",
+                         ifelse(df$Outlet_Type.SupermarketType3 == 1, "Supermarket Type3", NA))))
+
+# Controlla che la nuova variabile sia stata creata correttamente
+table(df$Outlet_Type)
+
+# Crea una tabella di contingenza tra i cluster di prezzo e i tipi di outlet
+outlet_price_cluster_table <- table(df$Outlet_Type, df$Cluster)
+print(outlet_price_cluster_table)
+
+# Visualizzazione con barplot
+barplot(outlet_price_cluster_table, beside = TRUE, legend = TRUE, 
+        col = c("red", "blue"), 
+        main = "Distribution of Outlet Types Across Price Clusters",
+        ylab = "Count",
+        xlab = "Outlet Type",
+        args.legend = list(title = "Cluster", x = "topright"))
+
+# Per una visualizzazione più dettagliata potresti utilizzare ggplot2
+library(ggplot2)
+df_long <- reshape2::melt(outlet_price_cluster_table)
+ggplot(df_long, aes(x = Var1, y = value, fill = Var2)) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    labs(x = "Outlet Type", y = "Count", fill = "Cluster") +
+    ggtitle("Distribution of Outlet Types Across Price Clusters") +
+    theme_minimal()
+
+```
+La distribuzione quasi uniforme dei tipi di outlet tra i due cluster di prezzi suggerisce che non c'è un tipo di outlet che domina un particolare cluster di prezzo. Questo può indicare che la strategia di prezzo o la gamma di prodotti potrebbe essere simile tra i vari tipi di outlet o che la segmentazione dei prezzi non è fortemente influenzata dal tipo di outlet.
+
+UN ULTIMA ANALISI CHE FACCIAMO E' TRA ITEM MRP E PRODOTTI GRASSI/NON GRASSI.
+
+
+```{R cluster on item fat content}
+# Crea sottoinsiemi per Regular e Low Fat considerando la codifica numerica
+df_regular <- df[df$Item_Fat == 2, ]  # Regular Fat
+df_low <- df[df$Item_Fat == 1, ]      # Low Fat
+
+# Statistiche per prodotti Regular e Low Fat in ciascun cluster
+regular_stats <- aggregate(Item_MRP ~ Cluster, data = df_regular, FUN = mean)
+low_fat_stats <- aggregate(Item_MRP ~ Cluster, data = df_low, FUN = mean)
+
+print(regular_stats)
+print(low_fat_stats)
+
+# Test t per confrontare i prezzi tra Regular Fat (2) e Low Fat (1) in ciascun cluster
+t_test_cluster1 <- t.test(Item_MRP ~ Item_Fat_Content, data = df[df$Cluster == '1', ], subset = Item_Fat_Content %in% c(1, 2))
+t_test_cluster2 <- t.test(Item_MRP ~ Item_Fat_Content, data = df[df$Cluster == '2', ], subset = Item_Fat_Content %in% c(1, 2))
+
+print(t_test_cluster1)
+print(t_test_cluster2)
+
+# Visualizzazione con ggplot2
+library(ggplot2)
+ggplot(df, aes(x = factor(Item_Fat_Content), y = Item_MRP, fill = factor(Item_Fat_Content))) +
+  geom_boxplot() +
+  facet_wrap(~Cluster) +
+  scale_fill_manual(values = c("blue", "red"), labels = c("Low Fat", "Regular Fat")) +
+  labs(title = "Distribution of Item MRP by Item Fat Content Across Clusters",
+       x = "Item Fat Content",
+       y = "Item Maximum Retail Price (MRP)",
+       fill = "Item Fat") +
+  theme_minimal()
+
+```
+
+
+scrivi interpret di questo
