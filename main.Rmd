@@ -28,10 +28,10 @@ l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 df= read.table(l,header=TRUE, sep=",") 
 ```
-##EDA
-###Data Cleaning
+#EDA
+##Data Cleaning
 
-####Checking and Removing Duplicates                                             
+###Checking and Removing Duplicates                                             
 ```{r Removing Duplicates, include=FALSE}
 # Check for entire row duplicates
 duplicates_entire_row <- duplicated(df)
@@ -62,7 +62,7 @@ If we go throughout the column `Item_Fat_Content` we can cearly see that there a
 To solve this problem, we edited the column "Item_Fat_Content" in this way: all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
 Then we will print the uniques name of the column after the edit to chek if the process ended successfully 
 
-####Checking for Missing Values
+###Checking for Missing Values
 
 ```{r check for missing values, echo=FALSE}
 
@@ -222,9 +222,6 @@ p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) +
   ylab("Item Visibility")
 print(p4)
 ```
-
-####scrivere il codice per rimuovere gli outliers
-since there are few outliers in the item visibility, we have decided to remove them.
 
 ```{r count 0 values in item visibility, include=FALSE}
 # Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
@@ -661,33 +658,8 @@ df <- df %>%
   bind_cols(combined_data_ohe)
 
 ```
-abbiamo fatto la one hot su outlet type e item_Type
+We performed One-Hot encoding was applied to the `Outlet Type`" and `Item_Type` variables to transform these categorical attributes into a numerical format that predictive models can interpret and accurately assess the impact of different categories on the target variable. 
 
-
-Modelli di previsione su:
-
-  -item rmp
-  -outlet size(?) o type
-  -Percentage of visibility
-  -Outlet id
-
-
-Ora dobbiamo creare dei lower-level model per vedere quali variabili utilizzare nel nostro dataset finale, intuitivamente abbiamo pensato che item rmp, outlet size, item visibility e outlet_id possano essere dei buoni indicatori.
-
-Per fare ciò, proviamo a predicare la nostra variabile target Item_Sales con queste 4 tramite GBM, possiamo usare gbm perchè avendo poche va
-
-Non possiamo usare outlet_ID perchè:
-
-non possiamo trasformarlo in numerico in quanto i valori non seguono un ordin
--I record unici sono solamente 10 quindi il modello avrebbe errori
-
-Possiaom però sostituire Outlet_ID con un'altra variabile ad esempio "Outlet_Age", per vedere se il numero di anni da cui è aperto un negozio inlfuisce su quanto venda un determinato prodotto.
-
-
-
-prima di tutto però dobbiamo dividere in test set e train set il nostro modello, useremo 80% in train ed il 20% in test
-
-Poiche non si possono eseguire lm se delle variabili hanno missing values, andremo a rimuovere i missing value/NA rimasti fino ad ora in modo tale da skippare le righe contenenti.
 
 ```{R splitting set, include=FALSE}
 library(caret)
@@ -700,9 +672,7 @@ index <- createDataPartition(df$Item_Outlet_Sales, p = 0.8, list = FALSE)
 train_data <- df[index, ]
 test_data <- df[-index, ]
 ```
-
-
-Ora andremo ad eseguire i 4 modelli sul train set
+Then we splitted our dataset in train and test set, we used 80% and 20% respectively
 
 
 ```{R model on the train set, include=FALSE}
@@ -784,18 +754,15 @@ print(data.frame(
 ))
 
 ```
+Then we constructed lower-level models to identify which variables will be most effective for our final dataset. Intuitively, we suspected that `Item_MRP`, `Outlet_Size`, `Item Visibility` and `Outlet ID` might be good indicators for predicting our target variable, `Item_Outlet_Sales`, however, `Outlet_ID` couldn’t be directly converted into a numeric format because its values do not follow a numerical order, making it unsuitable for regression models that require numerical inputs.
+As an alternative, we replaced it with `Outlet Age` (which ewe created before from `Outlet_Establishment_Year`) to examine whether the longevity of an outlet influences the sales of a product.
+In our linear models code we addressed any missing values in these variables as linear models cannot be executed with missing data, so we removed any remaining NAs to ensure the integrity of our analysis.
 
-
-
-	•	Item_MRP è la variabile più predittiva tra quelle considerate, spiegando circa il 30% della varianza nelle vendite. Questa variabile potrebbe essere utile nel modello finale.
-	•	Outlet_Size ha una capacità predittiva molto bassa ma potrebbe ancora fornire qualche informazione utile in un modello multivariato.
-	•	Item_Visibility e Outlet_Age hanno una capacità predittiva trascurabile e probabilmente non aggiungono valore significativo a un modello predittivo delle vendite se usate da sole.
-
-
-
-Selezione del miglior modello con la stepwise regression
-
-
+Regarding the predictive power of each variable:
+- **Item MRP** is highly predictive, explaining a significant portion of the variance in sales. This variable is likely to be a key component in the final model.
+- **Outlet Size** shows low predictive power but might still offer insights when combined with other variables in a multivariate model.
+- **Item Visibility** and **Outlet Age** appear to have negligible predictive ability when used alone. They might not significantly enhance a predictive model of sales.
+So our analysis will be runned on these variables.
 ```{R stepwise regression, Include=FALSE}
 if (!require(caret)) install.packages("caret")
 if (!require(MASS)) install.packages("MASS")
@@ -850,7 +817,7 @@ stepwise_variables <- stepwise_variables[-c(1, length(stepwise_variables))]
 # Print the list of variables used in the stepwise regression model
 print(stepwise_variables)
 ```
-## Ridge Regression
+After that we utilized stepwise regression to identify the most influential predictors for our target variable
 ```{R Ridge, include=FALSE }
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
@@ -907,7 +874,6 @@ cat("RMSE:", ridge_rmse, "\n")
 cat("R-squared:", ridge_r_squared, "\n")
 ```
 
-## Lasso Regression
 ```{R Lasso Regression, include=FALSE}
 # Modello Lasso
 set.seed(123)
@@ -956,9 +922,6 @@ cat("RMSE:", lasso_rmse, "\n")
 cat("R-squared:", lasso_r_squared, "\n")
 ```
 
-
-##Elastic Net
-
 ```{R elastic net, include=FALSE}
 set.seed(123)
 elastic_net_model <- cv.glmnet(x_train, y_train, alpha = 0.5, lambda = 10^seq(10, -2, length = 100))
@@ -1006,14 +969,13 @@ cat("Elastic Net Performance Metrics:\n")
 cat("RMSE:", elastic_net_rmse, "\n")
 cat("R-squared:", elastic_net_r_squared, "\n")
 ```
-
-Il valore R-squared per tutti i metodi non linear che abbiamo usato è simile, iintorno a 0.57 sia con tutte le variabili che con solo le variabili selezionate dalla stepwise regression, ora proviamo diverse tecniche per aumentare l r-square del nostro modello:
+We performed Ridge regression, Lasso regression, and Elastic Net using both the full set of variables and only those selected through stepwise regression. Across all methods, the R-squared values consistently remained around 0.57, regardless of whether we utilized all predictors or a reduced feature set. This indicates that the explanatory power of our models is unchanged, despite the variety of techniques and the breadth of variables considered.
 
 1. ensembling dei 3 metodi non lineari
 2. ulterior feature engineering
 3. Random Forest tree trovando il numero adeguato di alberi e di profondità
 
-
+####Ensembling Methods
 ```{R ensembling / stacking, echo=FALSE}
 set.seed(123)
 x_train <- model.matrix(Item_Outlet_Sales ~ . - 1, data = train_data)
@@ -1062,10 +1024,7 @@ cat("Stacking Performance Metrics:\n")
 cat("RMSE:", meta_rmse, "\n")
 cat("R-squared:", meta_r_squared, "\n")
 ```
-
-come possiamo vedere anche con lo stacking la performance è simile
-
-visto che anche con lo stacking la performance è simile, andiamo ad aggiungere delle nuove feature.
+We also performed ensembling/stacking, and as observed, the performance remains similar, with the R-squared value still around 0.57. Given that the performance did not improve significantly even with stacking, we will proceed to add new features to our model through another feature engineering to identify additional factors that could potentially enhance the predictive power and provide a better understanding of the variables influencing sales.
 
 ```{R feature engineering, include=FALSE}
 
@@ -1089,15 +1048,7 @@ df$MRP_x_Outlet_Size <- df$Item_MRP * df$Outlet_Size
 
 ```
 
-
-
-
-
-
-
-vediamo se la stepwise regression ora include anche variabili che abbiamo aggiunto con la feature
-
-```{R stepwise regression, include=FALSE}
+```{R stepwise regression}
 if (!require(caret)) install.packages("caret")
 if (!require(MASS)) install.packages("MASS")
 library(caret)
@@ -1115,7 +1066,7 @@ fit_initial <- lm(Item_Outlet_Sales ~ ., data = train_data)
 step_model <- stepAIC(fit_initial, direction = "backward", trace = FALSE)
 
 # Stampa del modello finale dopo la selezione backward
-print(summary(step_model))
+#print(summary(step_model))
 
 # Previsione sul test set utilizzando il modello selezionato
 predictions <- predict(step_model, newdata = test_data)
@@ -1137,23 +1088,13 @@ train_rmse <- sqrt(mean((train_predictions - train_actuals)^2))
 train_r_squared <- summary(lm(train_actuals ~ train_predictions))$r.squared
 
 # Stampa delle metriche di performance sul train set
-cat("Performance Metrics on Train Set:\n")
-cat("RMSE:", train_rmse, "\n")
-cat("R-squared:", train_r_squared, "\n")
-
+#cat("Performance Metrics on Train Set:\n")
+#cat("RMSE:", train_rmse, "\n")
+#cat("R-squared:", train_r_squared, "\n")
 ```
 
-qui dobbiamo stampare come sempre solo r square e rmse.
 
-
-
-
-
-Random Forest 
-
-
-
-```{r random forest tree using only selected variables, echo=FALSE}
+```{r random forest tree using only selected variables, echo=FALSE, warning=FALSE}
 # Install and load the randomForest package
 if (!require(randomForest)) {
     install.packages("randomForest", dependencies = TRUE)
@@ -1191,9 +1132,11 @@ cat("RMSE:", rf_rmse, "\n")
 cat("R-squared:", rf_r_squared, "\n")
 
 # Optionally, print variable importance
-print(importance(random_forest_model), type = 1)  # type = 1 for mean decrease in accuracy
+#print(importance(random_forest_model), type = 1)  # type = 1 for mean decrease in accuracy
 
 ```
+
+
 
 ```{r random forest tree mtry and node size number detection}
 # Install and load necessary packages
@@ -1245,17 +1188,19 @@ print(model$bestTune)
 print(model$results)
 
 ```
-CON NODE SIZE NODE=5 E MTRY = 18 ABBIAMO FINALMENTE TOCCATO IL 0.6 DI RSQUARED NAMOOOO
+After we applied the Random Forest we then perform Hyperparameter Tuning, the results are positive as with node_size = 5 and mtry = 18 we were able to obtain 0.6 of $R^2$ which is a positive increase cmapring to the previous models. 
 
+At first glance these scores could seem very low as normally a good model could reach even 0.8, but after a reasoning we conclude that this could be a great result as our dataset is about marketing techniques and some features can be interpreted in a very different way so we could expect a slightly lower final score as we're not dealing with scientific data.
 
-# Clustering
+#Task2
 
-Abbiamo deciso di fare il clustering su item MRP e outlet type per vedere se il mrp cambia in base al tipo di negozio
+## Clustering
 
-## Determining optimal number of clusters using the elbow method
+In this sections, we decided to perform clustering on `Item_MRP` and `Outlet_Type` to explore whether the maximum retail price of items varies significantly based on the type of outlet. By grouping the data into clusters, we aim to identify patterns and differences in pricing strategies across different outlet types. Specifically, we used K-means clustering with different numbers of clusters that we calculate later to see if certain outlet types tend to have higher or lower MRPs for their products.
 
-qui dobbiamo calculare il punto di elbow che è il punto più basso in cui la curva decresce, quel punto sarà il punto che ci indicherà il numero di clusters da usare
-```{R elbow method}
+### Determining optimal number of clusters using the elbow method
+
+```{R elbow method, echo=FALSE}
 
 # Load necessary library
 if (!require("stats")) install.packages("stats")
@@ -1285,28 +1230,52 @@ ggplot(elbow_plot, aes(x = k, y = wcss)) +
   theme_minimal()
 ```
 
-il numero di clusters ideale sembra essere 9, facciamo la silhouette analysis epr confermare:
+To find the perfect number of clusters we used the Elbow Method and the last point before the curve start increasing is 9 so the perfect number should be 9.
 
+```{r silhouettes analysis with both 9 and 2 clusters, echo=FALSE}
+# K-means clustering with k = 9
+optimal_k_9 <- 9
+kmeans_result_9 <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                                 "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
+                          centers = optimal_k_9, nstart = 50)
 
-```{R silhouette analysis}
-# K-means con k = 9, riconfermto come ottimale
-optimal_k <- 9
-final_kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
-                                     "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
-                              centers = optimal_k, nstart = 50)
+# K-means clustering with k = 2
+optimal_k_2 <- 2
+kmeans_result_2 <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
+                                 "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
+                          centers = optimal_k_2, nstart = 50)
 
-# Visualizzazione dei cluster finali
-library(ggplot2)
-df$Cluster <- final_kmeans_result$cluster
-ggplot(df, aes(x = factor(Cluster), y = Item_MRP, fill = factor(Cluster))) +
+# Adding cluster assignments to the dataframe
+df$Cluster_9 <- kmeans_result_9$cluster
+df$Cluster_2 <- kmeans_result_2$cluster
+
+# Plotting the clusters
+
+# Plot for k = 9
+p1 <- ggplot(df, aes(x = factor(Cluster_9), y = Item_MRP, fill = factor(Cluster_9))) +
   geom_boxplot() +
-  labs(title = "Distribution of Item MRP Across Clusters",
+  labs(title = "Distribution of Item MRP Across Clusters (k = 9)",
        x = "Cluster",
        y = "Item MRP") +
   scale_fill_brewer(palette = "Set3") +
   theme_minimal()
+
+# Plot for k = 2
+p2 <- ggplot(df, aes(x = factor(Cluster_2), y = Item_MRP, fill = factor(Cluster_2))) +
+  geom_boxplot() +
+  labs(title = "Distribution of Item MRP Across Clusters (k = 2)",
+       x = "Cluster",
+       y = "Item MRP") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_minimal()
+
+# Arranging plots in a grid
+grid.arrange(p1, p2, nrow = 2)
 ```
-```{r k-means clustering}
+After we selected nine clusters (k=9) based on the elbow method we can see frome the first plot the distribution of `Item_MRP` across these nine clusters. 
+However, we decided to simplify the clustering by reducing the number of clusters to two (k=2) because we needed to simplify the analysis and interpretation. The second plot illustrates the distribution of the MRP across these two clusters, clearly showing a division into High and Low MRP categories.
+
+```{r k-means clustering, echo=FALSE}
 # Assuming the elbow point is at k = 9 based on the plot
 optimal_k <- 2
 kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
@@ -1319,7 +1288,9 @@ df$Cluster <- kmeans_result$cluster
 summary <- aggregate(cbind(Item_MRP) ~ Cluster, data = df, FUN = mean)
 print(summary)
 ```
-```{r plotting the cluster}
+Here through this table we can see the mean values of the Item_MRP between the two clusters
+
+```{r plotting the cluster, include=FALSE}
 # Plotting the clusters
 ggplot(df, aes(x = Cluster, y = Item_MRP, color = factor(Cluster))) +
   geom_jitter(alpha = 0.5) +
@@ -1331,11 +1302,7 @@ ggplot(df, aes(x = Cluster, y = Item_MRP, color = factor(Cluster))) +
   theme_minimal()
 ```
 
-
-Verifica se certi tipi di prodotti sono più concentrati in uno dei due cluster. Vediamo ancora una volta se i prodotti che vendono di più sono quelli nel cluster 2(high MRP) o 1 (Low MRP). In teoria dovrebbero essere in quelli con l'MRP più alto
-
-
-```{r item outlet sales cluster mrp}
+```{r item outlet sales cluster mrp, include=FALSE}
 if (!require("ggplot2")) install.packages("ggplot2", dependencies = TRUE)
 library(ggplot2)
 
@@ -1360,51 +1327,86 @@ ggplot(df, aes(x = factor(Cluster), y = Item_Outlet_Sales, fill = factor(Cluster
   theme_minimal()
 
 ```
-Tesi confermata :)
 
+```{r cluster analyzing plots}
+if (!require("ggplot2")) install.packages("ggplot2", dependencies = TRUE)
+if (!require("gridExtra")) install.packages("gridExtra", dependencies = TRUE)
+library(ggplot2)
+library(gridExtra)
 
-Ora vediamo quali tipi di supermercato rientrano nella fascia che costa tanto e quali nella fascia che costa poco.
+# Plotting the clusters
+p1 <- ggplot(df, aes(x = Cluster, y = Item_MRP, color = factor(Cluster))) +
+  geom_jitter(alpha = 0.5) +
+  facet_wrap(~ Cluster) +
+  labs(title = "Cluster of Item MRP across Outlet Types",
+       x = "Cluster",
+       y = "Scaled Item MRP",
+       color = "Cluster") +
+  theme_minimal()
 
-Seguendo un'analisi puramente economica, i Grocery Store ed i Supermarket Type 1, dovranno stare nel cluster con i prezzi alti in quanto hanno pochi prodotti e quindi poca concorrenza interna
+# Statistiche Descrittive per Item_Outlet_Sales per Cluster
+sales_stats <- aggregate(Item_Outlet_Sales ~ Cluster, data = df, FUN = function(x) c(mean = mean(x), sd = sd(x), median = median(x), IQR = IQR(x)))
+print(sales_stats)
 
-```{R outlet type vs cluster mrp}
-# Rinomina le colonne rimuovendo gli spazi
+# Test di Significatività tra i due Cluster
+# Controlla prima che entrambi i cluster abbiano più di un elemento
+if (any(table(df$Cluster) > 1)) {
+  t_test_results <- t.test(Item_Outlet_Sales ~ Cluster, data = df)
+  print(t_test_results)
+}
+
+# Visualizzazione con Box Plot
+p2 <- ggplot(df, aes(x = factor(Cluster), y = Item_Outlet_Sales, fill = factor(Cluster))) +
+  geom_boxplot() +
+  labs(title = "Distribution of Item Outlet Sales Across Clusters",
+       x = "Cluster",
+       y = "Item Outlet Sales",
+       fill = "Cluster") +
+  theme_minimal()
+
+# Arrange the plots in a grid
+grid.arrange(p1, p2, ncol = 2)
+
+```
+After that we aimed to verify if certain products were concentrated in one of the two clusters but more importantly we would like to see if the products that have more sales are the ones with an higher MRP and from the second plot we can clearly see that this stands true confirming what we already saw in our EDA where higher MRP brings higher numbers of sales.
+
+```{r outlet type vs cluster mrp, echo=FALSE, message=FALSE, warning=FALSE}
+# Rename columns to remove spaces
 names(df) <- gsub(" ", "", names(df))
 
-# Verifica i nomi delle colonne aggiornati
+# Check updated column names
 print(names(df))
-# Ricrea la variabile Outlet_Type dal one-hot encoding
+
+# Recreate the Outlet_Type variable from one-hot encoding
 df$Outlet_Type <- ifelse(df$Outlet_Type.GroceryStore == 1, "Grocery Store",
                          ifelse(df$Outlet_Type.SupermarketType1 == 1, "Supermarket Type1",
-                         ifelse(df$Outlet_Type.SupermarketType2 == 1, "Supermarket Type2",
-                         ifelse(df$Outlet_Type.SupermarketType3 == 1, "Supermarket Type3", NA))))
+                                ifelse(df$Outlet_Type.SupermarketType2 == 1, "Supermarket Type2",
+                                       ifelse(df$Outlet_Type.SupermarketType3 == 1, "Supermarket Type3", NA))))
 
-# Controlla che la nuova variabile sia stata creata correttamente
+# Check the new variable creation
 table(df$Outlet_Type)
 
-# Crea una tabella di contingenza tra i cluster di prezzo e i tipi di outlet
+# Create a contingency table between price clusters and outlet types
 outlet_price_cluster_table <- table(df$Outlet_Type, df$Cluster)
 print(outlet_price_cluster_table)
 
-# Visualizzazione con barplot
-barplot(outlet_price_cluster_table, beside = TRUE, legend = TRUE, 
-        col = c("red", "blue"), 
-        main = "Distribution of Outlet Types Across Price Clusters",
-        ylab = "Count",
-        xlab = "Outlet Type",
-        args.legend = list(title = "Cluster", x = "topright"))
-
-# Per una visualizzazione più dettagliata potresti utilizzare ggplot2
-library(ggplot2)
+# Convert the table to a long format for ggplot2
 df_long <- reshape2::melt(outlet_price_cluster_table)
-ggplot(df_long, aes(x = Var1, y = value, fill = Var2)) +
-    geom_bar(stat = "identity", position = position_dodge()) +
-    labs(x = "Outlet Type", y = "Count", fill = "Cluster") +
-    ggtitle("Distribution of Outlet Types Across Price Clusters") +
-    theme_minimal()
 
+# Barplot using ggplot2 (Base R equivalent)
+barplot1 <- ggplot(df_long, aes(x = Var1, y = value, fill = Var2)) +
+            geom_bar(stat = "identity", position = position_dodge()) +
+            labs(x = "Outlet Type", y = "Count", fill = "Cluster") +
+            ggtitle("Distribution of Types Across Price Clusters") +
+            theme_minimal()
+
+# Convert the table to a grob for displaying
+table_grob <- tableGrob(outlet_price_cluster_table)
+
+# Combine the table and the bar plot in a grid
+grid.arrange(table_grob, barplot1, ncol = 2)
 ```
-La distribuzione quasi uniforme dei tipi di outlet tra i due cluster di prezzi suggerisce che non c'è un tipo di outlet che domina un particolare cluster di prezzo. Questo può indicare che la strategia di prezzo o la gamma di prodotti potrebbe essere simile tra i vari tipi di outlet o che la segmentazione dei prezzi non è fortemente influenzata dal tipo di outlet.
+We wanted to see which types of outlets fall into high and low price clusters. Based on economic reasoning, we expected that Grocery Stores and Supermarket Type 1 would fall into the high-price cluster due to their limited product variety, implying less internal competition. However, our analysis revealed a more uniform distribution of outlet types between the price clusters. This suggests that no particular outlet type dominates a specific price cluster, indicating similar pricing strategies or product ranges across different outlet types. Essentially, price segmentation is not heavily influenced by the outlet type. You can see this clearly in the table and the bar plot, where the counts of each outlet type are relatively balanced across the clusters. This outcome was a bit surprising but provides valuable insight into how BigMart’s outlets manage their pricing strategies regardless of the outlet type.
 
 UN ULTIMA ANALISI CHE FACCIAMO E' TRA ITEM MRP E PRODOTTI GRASSI/NON GRASSI.
 
