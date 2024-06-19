@@ -31,8 +31,8 @@ library(gridExtra)
 #EDA
 ##Data Cleaning
 
-###Checking and Removing Duplicates
-```{r Removing Duplicates}
+###Checking and Removing Duplicates                                             
+```{r Removing Duplicates, include=FALSE}
 # Check for entire row duplicates
 duplicates_entire_row <- duplicated(df)
 
@@ -45,13 +45,16 @@ As we can see there aren’t any duplicates in our data set, so we can proceed t
 ###Fixing Features of the Dataset
 
  
-```{r unique values}
+```{r unique values, echo=FALSE}
 item_fat_content_uniques <- unique(df$Item_Fat_Content)#unique values of item_fat_content
 
 print(item_fat_content_uniques)
 ```
+abbiamo visto che se inizia con L appartiene a Low fat, altrimenti a Regular Fat.
 
-```{r sistemare nomi item_fat_content}
+
+
+```{r sistemare nomi item_fat_content, include=FALSE}
 df$Item_Fat_Content <- ifelse(grepl("^[Rr]", df$Item_Fat_Content), "Regular Fat", "Low Fat")
 item_fat_content_uniques <- unique(df$Item_Fat_Content)
 
@@ -68,7 +71,7 @@ Then we will print the uniques name of the column after the edit to chek if the 
 
 ###Checking for Missing Values
 
-```{r check for missing values}
+```{r check for missing values, echo=FALSE}
 
 # Crea una copia del dataframe convertendo tutte le colonne in stringhe
 df_copy <- lapply(df, as.character)
@@ -92,7 +95,7 @@ We see that there are 3 columns with missing values:
 -Outlet_Size
 
 
-```{r Outlet size analysis}
+```{r Outlet size analysis, echo=FALSE}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
@@ -111,10 +114,7 @@ print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", perce
 
 
 
-
-
-
-```{r updating outlet_size}
+```{r updating outlet_size, include=FALSE}
 # Aggiornamento della colonna 'Outlet_Size'
 df <- df %>%
   mutate(Outlet_Size = case_when(
@@ -135,7 +135,7 @@ print(outlet_summary)
 
 ```
 
-```{r Outlet_Size Analysis 2}
+```{r Outlet_Size Analysis 2, echo=FALSE}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
@@ -155,7 +155,7 @@ print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", perce
 
 
 
-```{r adding na values}
+```{r adding na values, include=FALSE}
 # Aggiornamento della colonna 'Outlet_Size' per riempire le stringhe vuote
 df <- df %>%
   mutate(Outlet_Size = if_else(nchar(Outlet_Size) == 0, "NA", Outlet_Size))
@@ -173,7 +173,8 @@ These imputations reduced the percentage of missing values from 28% to 21%, decr
 Regarding "Supermarket Type1" we do not have enough informations or clear patterns, so we had to fill the remaining missing entries with a placeholder value of "NA", ensuring no data point within "Outlet_Size" remained unaddressed.
 
 
-```{r factor converting}
+
+```{r factor converting, include=FALSE}
 
 # Conversione di 'Outlet_Size' in valori numerici
 df <- df %>%
@@ -203,7 +204,7 @@ We converted as factor the columns `Item_Fat_Content` and we also want to conver
 
 
 
-```{r handling missing item_weight}
+```{r handling missing item_weight, include=FALSE}
 
 # Calcolare la media del peso per ogni categoria di prodotto
 average_weight_per_type <- aggregate(Item_Weight ~ Item_Type, data = df, mean, na.rm = TRUE)
@@ -234,7 +235,29 @@ At the end, we checked for every record with missing `Item_Weight` and we will d
 2. We will put in item_weight, the mean of the weights of the products of the same category.
 
 
-```{r count 0 values}
+
+# Handling with item visibility
+##checking for outliers before removing 0
+
+```{r visibility plot, include=False}
+
+
+p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
+  geom_boxplot(fill = 'green', alpha = 0.7) + 
+  ggtitle("Box Plot of Item Visibility") +
+  xlab("") +
+  ylab("Item Visibility")
+print(p4)
+```
+
+since there are few outliers in the item visibility, we have decided to remove them.
+
+#scrivere il codice per rimuovere gli outliers
+
+
+
+
+```{r count 0 values in item visibility, include=FALSE}
 # Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
 zero_visibility_counts <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, function(x) sum(x == 0))
 
@@ -245,7 +268,7 @@ names(zero_visibility_counts)[2] <- "Zero_Item_Visibility_Count"
 print(zero_visibility_counts)
 ```
 
-```{r count Visibility for each store 2}
+```{r count Visibility for each store 2, include=FALSE}
 
 visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
 names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
@@ -275,8 +298,6 @@ df$Item_Visibility[df$Item_Visibility == 0] <- df$Item_Visibility.new[df$Item_Vi
 # Rimuovere le colonne in più create dal merge
 df <- df[, !names(df) %in% c("Item_Visibility.new", "key")]
 
-# Visualizzare il dataframe aggiornato
-head(df)
 ```
 ```{r dropping useless }
 df <- df %>%
@@ -292,7 +313,10 @@ For this reason we decided to change our strategy and to fill the missing values
 We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
 
 
-```{r unique categories of "Item_Type"}
+
+#category reduction of Item_Type
+
+```{r unique categories of "Item_Type", echo=FALSE}
 #finding out all the uniques
 
 
@@ -325,39 +349,22 @@ df <- df %>%
 df <- df %>%
   rename(Item_Type = Item_Type_Reduced)
 ```
+we have converted item_type_category into:
+Food basics 
+Processed Foods
+Beverages
+Non-Food Items
+Produce
+Others
+
+Per avere risultati più basati sul tipo di prodotto e non sul prodotto in se
 
 
 
 
-```{r visibility plot}
-# Histogram and Box Plot for Item_Visibility
-p3 <- ggplot(df, aes(x = Item_Visibility)) + 
-  geom_histogram(binwidth = 0.01, fill = 'green', alpha = 0.7) + 
-  ggtitle("Distribution of Item Visibility") +
-  xlab("Item Visibility") +
-  ylab("Frequency")
-
-p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) + 
-  geom_boxplot(fill = 'green', alpha = 0.7) + 
-  ggtitle("Box Plot of Item Visibility") +
-  xlab("") +
-  ylab("Item Visibility")
-print(p3)
-print(p4)
-```
-Finally we fixed the missing values for `Item_Visibility`. To do it we firstly count the number of missing values for each of the 10 shops and their visibility to understand how much visibility we are missing from each store. Our first idea was to subtract each visibility percentage from 100% and then equally divide the remaining visibility among the number of missing visibility product. In doing that we obtained biased and not consistent data because:
-
-1. The filled visibility in each product was too high compared to the non-zeros values
-2. After adding again all the visibility the result was 100% for each shop, but could also be true that in some shops some products are out of stock so the final visibility could be less than 100%
-
-For this reason we decided to change our strategy and to fill the missing values we firstly find the missing `Item_Visibility`, then through the `Item_ID` we find all the shops that have for that product a real value, then we check the `Outlet_Size` of each shop and compare to the one of the market with missing value if it's the same we compute the mean throu all the visibility that match these criteria.
-
-We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
 
 
-
-
-```{r count Visibility for each store}
+```{r count Visibility for each store, include=FALSE}
 
 visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
 names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
@@ -371,7 +378,7 @@ print(visibility_sum_per_store)
 
 Now we will start to find out some correlations between variables.
 
-```{R corr matrix}
+```{R corr matrix, echo=FALSE}
 
 # Calculate Spearman's rank correlation matrix again if not already calculated
 cor_matrix <- cor(df %>% select(where(is.numeric)), 
@@ -386,17 +393,26 @@ corrplot(cor_matrix, method = "circle", type = "upper", order = "hclust",
          number.cex = 0.6)  # Adjust coefficient text size appropriately
 
 ```
-DOBBIAMO DROPPARE LE COLONNE REMINAINING VISIBILITY EZERO ITEM VISIBILITY COUNT
 
 
 
 We can see that there are big positive relation between:
 
-outlet_size-item visibility
-item_outlet_sales and outlet_size
-item_mrp and item_outlet_sales
+Outlet_Size and Item_Outlet_Sales, it seems that the bigger the outlet, the higher the sales
 
-```{r item MRP vs Outlet sales with gaps of price }
+Item_MRP and Item_Outlet_Sales, an higher mrp lead to an increase in sales of that product
+
+Small negative correlation betwen item_visibility and outlet_size 
+
+Small negative correlation between item_visibility and item_outlet_sales
+
+#Item MRP and Outlet Sales
+
+as stated in the corr matrix wecan see that the higher the MRP, the higher the outlet sales.
+In the following plot we can focus on the "blank zones" in which there are not sales.
+We have findout that there 
+
+```{r item MRP vs Outlet sales with gaps of price, echo=FALSE }
 # Load necessary libraries
 library(ggplot2)
 
@@ -438,14 +454,14 @@ ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Ty
 zi qua c'è scritto che più vendi e più alzi il prezzo di base
 
 
-```{R item outlet sales by outlet size}
+```{R item outlet sales by outlet size, include=FALSE}
 ggplot(df, aes(x = Outlet_Size, y = Item_Outlet_Sales)) +
   geom_boxplot(aes(fill = Outlet_Size)) +
   labs(title = "Item Outlet Sales by Outlet Size",
        x = "Outlet Size", y = "Outlet Sales")
 ```
 
-```{R Sales trends over the years}
+```{R Sales trends over the years, include=FALSE}
 ggplot(df, aes(x = Outlet_Establishment_Year, y = Item_Outlet_Sales)) +
   geom_point(aes(color = Outlet_Establishment_Year)) +
   geom_smooth(method = "lm") +
@@ -454,7 +470,7 @@ ggplot(df, aes(x = Outlet_Establishment_Year, y = Item_Outlet_Sales)) +
 
 ```
 
-```{R  Item_Outlet_Sales density plot}
+```{R  Item_Outlet_Sales density plot, include=FALSE}
 # Create a density plot
 ggplot(data = df, aes(x = Item_Outlet_Sales)) +
   geom_density(fill = "turquoise", alpha = 0.5) +  # 'alpha' controls transparency
@@ -464,7 +480,11 @@ ggplot(data = df, aes(x = Item_Outlet_Sales)) +
   theme_light()
 ```
 
-```{r Advanced visualization Visibility-Sales}
+```{r Advanced visualization Visibility-Sales, echo=FALSE, message=FALSE}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+
 # Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
 df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
 df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
@@ -478,21 +498,6 @@ item_type_models <- df %>%
   group_by(Item_Type) %>%
   do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
 
-# Viewing summaries for each Item Type
-item_type_summaries <- lapply(item_type_models$model, summary)
-
-# Print the summaries for review
-print(item_type_summaries)
-
-# Creating scatter plots segmented by Item_Type
-p_item_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", color = "blue", se = FALSE) +
-  facet_wrap(~ Item_Type) +
-  labs(title = "Item Visibility vs Outlet Sales by Item Type",
-       x = "Item Visibility", y = "Outlet Sales") +
-  theme_minimal()
-
 # Creating scatter plots segmented by Outlet_Type
 p_outlet_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
   geom_point(alpha = 0.5) +
@@ -503,11 +508,12 @@ p_outlet_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
   theme_minimal()
 
 # Print the plots
-print(p_item_type)
 print(p_outlet_type)
 ```
 
-```{r Linear model to investigate on Item Visibility and Sales}
+
+
+```{r Linear model to investigate on Item Visibility and Sales, include=False}
 # Fit a linear model
 model <- lm(Item_Outlet_Sales ~ Item_Visibility + Item_Type + Outlet_Type + Item_Fat_Content + Item_MRP, data = df)
 
@@ -515,7 +521,11 @@ model <- lm(Item_Outlet_Sales ~ Item_Visibility + Item_Type + Outlet_Type + Item
 summary(model)
 ```
 
-```{r Distribution of Variables across Item Sales}
+scriviamo a mano cosa abbiamo fatto e l'output
+
+
+
+```{r Distribution of Variables across Item Sales, echo=false}
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
@@ -559,8 +569,11 @@ for(var in categorical_vars) {
 
 ```
 
+#metti in grid i grafici ti average sales by oytlet_sizes, scatterplot di item visibility vs outlet sales ed i due di prima.
 
-```{R item visibility vs item mrp scatterplot}
+
+
+```{R item visibility vs item mrp scatterplot, include=FALSE}
 # Load ggplot2
 library(ggplot2)
 
@@ -579,7 +592,7 @@ ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
 
 
 
-```{R item visibility vs item mrp line graph}
+```{R item visibility vs item mrp line graph, include=FALSE}
 # Create bins for Item MRP using a reasonable interval
 df$MRP_Bin <- cut(df$Item_MRP, breaks=seq(from=min(df$Item_MRP), to=max(df$Item_MRP), by=20), include.lowest=TRUE, right=TRUE)
 
@@ -595,10 +608,11 @@ ggplot(average_visibility_per_mrp, aes(x = MRP_Bin, y = Item_Visibility, group=1
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Improve x-axis label readability
 ```
+scriviamo che gli item con la visibilità più alta sono quelli con l ' mrp più basso
 
 gli item che fanno vedere di può sono quelli che vendono a di meno quindi quelli di cui vogliono sbarazzarsi.
 
-```{r Segmented Analysis Regression}
+```{r Segmented Analysis Regression, include=FALSE}
 # Load necessary libraries
 library(ggplot2)
 library(dplyr)
@@ -637,7 +651,7 @@ Nei grocery store l'item visibility non influisce sul numero di vendite perchè 
 
 ###Checking for Outliers
 
-```{r plots to see outliers}
+```{r plots to see outliers, include=FALSE}
 # Load necessary libraries
 library(ggplot2)
 library(gridExtra)
@@ -705,9 +719,10 @@ print(p7)
 print(p8)
 
 ```
+abbiamo controllato che non ci sono outliers ma solo qualche valore alto in item sales e item visibility che però potrebbero essere veri
 
 
-```{r Item type vs Item_Sales}
+```{r Item type vs Item_Sales, include=FALSE}
 
 # Esegui ANOVA
 avg_sales_by_type <- df %>%
@@ -732,7 +747,7 @@ There are not effective evidences of difference in item_sales based on item_type
 
 
 # Lower Dimensional Models
-```{r Impact of item MRP ad Outlet Type on Sales 2 }
+```{r Impact of item MRP ad Outlet Type on Sales 2, include=FALSE }
 model_mrp_outlet <- lm(Item_Outlet_Sales ~ Item_MRP * Outlet_Type, data = df)
 summary(model_mrp_outlet)
 
@@ -743,6 +758,8 @@ ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales, color = Outlet_Type)) +
   facet_wrap(~Outlet_Type) +
   labs(title = "Impact of MRP and Outlet Type on Sales")
 ```
+
+
 
 
 ## Visualization Interpretation
@@ -762,27 +779,11 @@ The regression output provides the following insights:
 
 Intercept: The intercept is not meaningful on its own without context as it represents sales when MRP is zero and not belonging to any specific outlet type, which is not a practical scenario.
 
-Item_MRP: There's a significant positive coefficient for MRP, indicating that overall, an increase in MRP tends to lead to an increase in sales across the dataset.
-
-Outlet_Type Coefficients:
-
-Supermarket Type1: The interaction term Item_MRP:Outlet_TypeSupermarket Type1 is significant and positive, which supports the visual interpretation that higher MRP increases sales more in this supermarket type compared to the baseline (Grocery Store).
-Supermarket Type2: Similarly, the positive coefficient for the interaction with MRP suggests increased sales with higher MRP, but the effect is smaller than in Type1.
-Supermarket Type3: Exhibits the strongest positive interaction effect with MRP, indicating that sales in these stores are most positively influenced by higher MRP.
-Model Fit:
-
-The Multiple R-squared value is 0.6054, meaning that about 60.54% of the variability in sales is explained by the model, which is reasonably good given the complexity of retail sales dynamics.
-The F-statistic is highly significant (p < 2.2e-16), indicating that the model is statistically significant and that the model fits the data better than a model with no predictors.
-Conclusions
-This analysis suggests that MRP and outlet type are significant predictors of sales. Higher MRP generally leads to higher sales, especially in supermarket types where customers might be less sensitive to price increases. Grocery stores show minimal changes in sales with changes in MRP, indicating a different customer base or purchase behavior.
-
-These insights can help BigMart tailor its pricing strategies according to the type of outlet, potentially focusing on premium pricing strategies in supermarket types where the customer base responds positively to higher-priced items.
 
 
 
 
-
-```{r Impact of item MRP ad Outlet Type on Sales }
+```{r Impact of item MRP ad Outlet Type on Sales, include=FALSE }
 # Adjusting the model to focus only on Item Visibility
 model_visibility <- lm(Item_Outlet_Sales ~ Item_Visibility, data = df)
 summary(model_visibility)
@@ -800,61 +801,12 @@ Dobbiamo scriveree interprertazione di questo grafico
 
 
 
-#Feature Engineering
-```{r feature engineering}
-df <- df %>%
-  mutate(
-    # Convert Establishment Year to Age
-    Outlet_Age = as.numeric(format(Sys.Date(), "%Y")) - Outlet_Establishment_Year,
-    
-    # Interaction between MRP and Outlet Type
-    MRP_x_OutletType = Item_MRP * as.numeric(as.factor(Outlet_Type)),
-
-    
-    # Simplifying Item Type
-    Item_Type_Simplified = case_when(
-      grepl("Foods", Item_Type) ~ "Foods",
-      grepl("Drinks", Item_Type) ~ "Drinks",
-      TRUE ~ "Non-Consumables"
-    )
-  )
-
-# Ensure that categorical variables are in the correct format
-df$Outlet_Type <- as.factor(df$Outlet_Type)
-df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
-df$Item_Type_Simplified <- as.factor(df$Item_Type_Simplified)
-df$Outlet_Identifier <- as.factor(df$Outlet_Identifier)
-
-df <- df %>%
-  select(-c(Outlet_Age, MRP_x_OutletType))
-```
-
-
-trasformare da anno di nascita ad età
-
-trasformare in percentuale item visibility.
-
-
-Modelli di previsione su:
-
-  -item rmp
-  -outlet size(?) o type
-  -Percentage of visibility
-  -Outlet id
-  
-  
-poi una volta fatto questo, scegliamo quali variabili sono più influenti e le buttiamo nel modello finale
-
-e poi ragioniamo su come fare il modello finale
 
 
 
+from establishmenbt year to age 
 
-Feature Selection with Stepwise Regression
-
-
-
-```{r calculating Outlet Age}
+```{r calculating Outlet Age, include=FALSE}
 # Add a new column 'Outlet_Age' to the dataframe
 df <- df %>%
   mutate(Outlet_Age = as.numeric(format(Sys.Date(), "%Y")) - Outlet_Establishment_Year)
@@ -879,39 +831,14 @@ sales_with_age <- merge(sales_summary, store_ages, by = "Outlet_Identifier")
 # Load the ggplot2 library
 library(ggplot2)
 
-# Plot total sales by Outlet_ID with Outlet_Age in the x-axis labels
-ggplot(sales_with_age, aes(x = Outlet_Identifier, y = Total_Sales)) +
-  geom_bar(stat = "identity", fill = "cornflowerblue") +
-  scale_y_continuous(labels = scales::comma) +
-  labs(title = "Total Sales by Outlet ID with Age Labels",
-       x = "Outlet ID (Age)",
-       y = "Total Sales") +
-  scale_x_discrete(labels = paste(sales_with_age$Outlet_Identifier, "\n(Age:", sales_with_age$Outlet_Age, "yrs)")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))  # Adjust text to make it readable
-
-
-```
-####counting number of sales for store perche mi sembra strano
-
-```{r counting number of sales for each store}
-
-# Sum the total sales for each outlet, grouped by Outlet Identifier and include Outlet Age
-sales_summary <- df %>%
-  group_by(Outlet_Identifier, Outlet_Age) %>%
-  summarise(Total_Sales = sum(Item_Outlet_Sales), .groups = 'drop') %>%
-  arrange(desc(Total_Sales))
-
-# Print the summary table with total sales and outlet age
-print(sales_summary)
 ```
 
-```{R one hot econding}
+```{R one hot econding, include=FALSE}
 # Identificazione delle variabili categoriche per l'encoding
 categorical_vars <- c("Outlet_Type", "Item_Type_Simplified")
 
 # Applicazione del one-hot encoding
-dummies <- dummyVars(~ Outlet_Type + Item_Type_Simplified, data = df, fullRank = FALSE)
+dummies <- dummyVars(~ Outlet_Type + Item_Type, data = df, fullRank = FALSE)
 combined_data_ohe <- predict(dummies, newdata = df)
 
 # Conversione in dataframe
@@ -923,6 +850,7 @@ df <- df %>%
   bind_cols(combined_data_ohe)
 
 ```
+abbiamo fatto la one hot su outlet type e item_Type
 
 
 Modelli di previsione su:
@@ -950,7 +878,7 @@ prima di tutto però dobbiamo dividere in test set e train set il nostro modello
 
 Poiche non si possono eseguire lm se delle variabili hanno missing values, andremo a rimuovere i missing value/NA rimasti fino ad ora in modo tale da skippare le righe contenenti.
 
-```{R splitting set}
+```{R splitting set, include=FALSE}
 library(caret)
 
 # Impostazione del seed per la riproducibilità
@@ -966,7 +894,7 @@ test_data <- df[-index, ]
 Ora andremo ad eseguire i 4 modelli sul train set
 
 
-```{R model on the train set}
+```{R model on the train set, include=FALSE}
 # Carico le librerie necessarie, se non già caricato
 if (!require("ggplot2")) install.packages("ggplot2")
 library(ggplot2)
@@ -1004,8 +932,7 @@ print(summary(model_Outlet_Age))
 
 ```
 
-```{R model on the test set}
-# Assumo che il tuo dataframe si chiami test_data
+```{R model on the test set, include=FALSE}
 
 # Modello per Item_MRP sul test set
 test_data_MRP <- na.omit(test_data[, c("Item_MRP", "Item_Outlet_Sales")])
@@ -1046,8 +973,6 @@ print(data.frame(
 ))
 
 ```
-scrivi il chunk in cui vengono comparate le performance del test e del train.
-
 
 
 
@@ -1060,7 +985,7 @@ scrivi il chunk in cui vengono comparate le performance del test e del train.
 Selezione del miglior modello con la stepwise regression
 
 
-```{R stepwise regression}
+```{R stepwise regression, Include=FALSE}
 if (!require(caret)) install.packages("caret")
 if (!require(MASS)) install.packages("MASS")
 library(caret)
@@ -1105,7 +1030,7 @@ cat("RMSE:", train_rmse, "\n")
 cat("R-squared:", train_r_squared, "\n")
 
 ```
-```{r Extracting Stepwise Variables}
+```{r Extracting Stepwise Variables, include=FALSE}
 # Extracting the names of the variables used in the final stepwise model
 stepwise_variables <- names(coef(step_model))
 stepwise_variables <- c(stepwise_variables, "")
@@ -1115,7 +1040,7 @@ stepwise_variables <- stepwise_variables[-c(1, length(stepwise_variables))]
 print(stepwise_variables)
 ```
 ## Ridge Regression
-```{R Ridge }
+```{R Ridge, include=FALSE }
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 # Preparazione dei dati
@@ -1141,7 +1066,7 @@ cat("RMSE:", ridge_rmse, "\n")
 cat("R-squared:", ridge_r_squared, "\n")
 ```
 
-```{r Ridge using only the variables selected from stepwise}
+```{r Ridge using only the variables selected from stepwise, include=FALSE}
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
@@ -1172,7 +1097,7 @@ cat("R-squared:", ridge_r_squared, "\n")
 ```
 
 ## Lasso Regression
-```{R Lasso Regression}
+```{R Lasso Regression, include=FALSE}
 # Modello Lasso
 set.seed(123)
 lasso_model <- cv.glmnet(x_train, y_train, alpha = 1, lambda = 10^seq(10, -2, length = 100))
@@ -1190,7 +1115,7 @@ cat("RMSE:", lasso_rmse, "\n")
 cat("R-squared:", lasso_r_squared, "\n")
 ```
 
-```{r lasso with only the selected variables by stepwise reg}
+```{r lasso with only the selected variables by stepwise reg, include=FALSE}
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
@@ -1223,7 +1148,7 @@ cat("R-squared:", lasso_r_squared, "\n")
 
 ##Elastic Net
 
-```{R elastic net}
+```{R elastic net, include=FALSE}
 set.seed(123)
 elastic_net_model <- cv.glmnet(x_train, y_train, alpha = 0.5, lambda = 10^seq(10, -2, length = 100))
 best_lambda_elastic_net <- elastic_net_model$lambda.min
@@ -1240,7 +1165,7 @@ cat("RMSE:", elastic_net_rmse, "\n")
 cat("R-squared:", elastic_net_r_squared, "\n")
 ```
 
-```{r elastic net using only the variables selected by stepwise}
+```{r elastic net using only the variables selected by stepwise, include=FALSE}
 if (!require(glmnet)) install.packages("glmnet")
 library(glmnet)
 
@@ -1271,16 +1196,14 @@ cat("RMSE:", elastic_net_rmse, "\n")
 cat("R-squared:", elastic_net_r_squared, "\n")
 ```
 
+Il valore R-squared per tutti i metodi non linear che abbiamo usato è simile, iintorno a 0.57 sia con tutte le variabili che con solo le variabili selezionate dalla stepwise regression, ora proviamo diverse tecniche per aumentare l r-square del nostro modello:
 
-Il valore R-squared per ogni metodo utilizzato è di circa 0.57, ora abbiamo più modi di procedere (li faremo tutti):
+1. ensembling dei 3 metodi non lineari
+2. ulterior feature engineering
+3. Random Forest tree trovando il numero adeguato di alberi e di profondità
 
-1. Stacking dei diversi metodi utilizzati fino ad ora
-2. Ulteriore feature engineering
-3. Modelli non lineari come il gadient boosting machines
-4. Hyperparameter Tuning
-5. La cross-validation
 
-```{R ensembling / stacking}
+```{R ensembling / stacking, echo=FALSE}
 set.seed(123)
 x_train <- model.matrix(Item_Outlet_Sales ~ . - 1, data = train_data)
 y_train <- train_data$Item_Outlet_Sales
@@ -1328,11 +1251,12 @@ cat("Stacking Performance Metrics:\n")
 cat("RMSE:", meta_rmse, "\n")
 cat("R-squared:", meta_r_squared, "\n")
 ```
-head(df)
+
+come possiamo vedere anche con lo stacking la performance è simile
 
 visto che anche con lo stacking la performance è simile, andiamo ad aggiungere delle nuove feature.
 
-```{R feature engineering}
+```{R feature engineering, include=FALSE}
 
 # Creazione della variabile Price_Per_Unit_Weight
 df$Price_Per_Unit_Weight <- ifelse(is.na(df$Item_Weight), 0, df$Item_MRP / df$Item_Weight)
@@ -1342,7 +1266,6 @@ df$Price_Per_Unit_Weight <- ifelse(is.na(df$Item_Weight), 0, df$Item_MRP / df$It
 df$Log_Item_Visibility <- log(df$Item_Visibility + 1)
 
 # Verifica delle prime righe del dataset per controllare le nuove variabili
-head(df)
 sum(is.na(df$Item_MRP))
 sum(is.na(df$Outlet_Size))
 df <- na.omit(df, cols = "Outlet_Size")
@@ -1361,9 +1284,9 @@ df$MRP_x_Outlet_Size <- df$Item_MRP * df$Outlet_Size
 
 
 
+vediamo se la stepwise regression ora include anche variabili che abbiamo aggiunto con la feature
 
-
-```{R stepwise regression}
+```{R stepwise regression, include=FALSE}
 if (!require(caret)) install.packages("caret")
 if (!require(MASS)) install.packages("MASS")
 library(caret)
@@ -1409,17 +1332,17 @@ cat("R-squared:", train_r_squared, "\n")
 
 ```
 
+qui dobbiamo stampare come sempre solo r square e rmse.
 
 
 
 
 
-
-Random Forest tree using only selected
-
+Random Forest 
 
 
-```{r random forest tree using only selected variables}
+
+```{r random forest tree using only selected variables, echo=FALSE}
 # Install and load the randomForest package
 if (!require(randomForest)) {
     install.packages("randomForest", dependencies = TRUE)
@@ -1556,7 +1479,7 @@ il numero di clusters ideale sembra essere 9, facciamo la silhouette analysis ep
 
 ```{R silhouette analysis}
 # K-means con k = 9, riconfermto come ottimale
-optimal_k <- 2
+optimal_k <- 9
 final_kmeans_result <- kmeans(df[, c("Item_MRP", "Outlet_Type.Grocery Store", "Outlet_Type.Supermarket Type1",
                                      "Outlet_Type.Supermarket Type2", "Outlet_Type.Supermarket Type3")],
                               centers = optimal_k, nstart = 50)
