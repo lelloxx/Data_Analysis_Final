@@ -14,6 +14,10 @@ library(rpart)
 library(e1071)
 library(splines)
 library(MASS)
+library(dplyr)
+library(corrplot)
+library(ggplot2)
+library(gridExtra)
 ```
 
 Importing dataset and libraries
@@ -22,16 +26,12 @@ a="/Users/alessandroausteri/Documents/GitHub/Data_Analysis_Final/BigMartSales.cs
 l="/Users/lorenzolaterza/Desktop/Data_Analysis_Final/BigMartSales.csv"
 
 
-df= read.table(a,header=TRUE, sep=",") 
-library(dplyr)
-library(corrplot)
-library(ggplot2)
-library(gridExtra)
+df= read.table(l,header=TRUE, sep=",") 
 ```
-#EDA
-##Data Cleaning
+##EDA
+###Data Cleaning
 
-###Checking and Removing Duplicates                                             
+####Checking and Removing Duplicates                                             
 ```{r Removing Duplicates, include=FALSE}
 # Check for entire row duplicates
 duplicates_entire_row <- duplicated(df)
@@ -40,7 +40,7 @@ duplicates_entire_row <- duplicated(df)
 num_entire_row_duplicates <- sum(duplicates_entire_row)
 print(paste("Number of duplicated rows:", num_entire_row_duplicates))
 ```
-As we can see there aren’t any duplicates in our data set, so we can proceed to find which columns have missing values
+There aren’t any duplicates in our data set.
 
 ###Fixing Features of the Dataset
 
@@ -50,9 +50,6 @@ item_fat_content_uniques <- unique(df$Item_Fat_Content)#unique values of item_fa
 
 print(item_fat_content_uniques)
 ```
-abbiamo visto che se inizia con L appartiene a Low fat, altrimenti a Regular Fat.
-
-
 
 ```{r sistemare nomi item_fat_content, include=FALSE}
 df$Item_Fat_Content <- ifelse(grepl("^[Rr]", df$Item_Fat_Content), "Regular Fat", "Low Fat")
@@ -61,15 +58,11 @@ item_fat_content_uniques <- unique(df$Item_Fat_Content)
 print(item_fat_content_uniques)
 
 ```
-If we go throughout the column `Item_Fat_Content` we can cearly see that there are some inconsistencies, in fact we have 2 different names for "Regular Fat" that are "Regular" and "reg" and 3 different names for "Low Fat" that are "Low fat", "low fat", "LF"
-
-To solve this problem, we edited the column "Item_Fat_Content" in this way:
-all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
-
+If we go throughout the column `Item_Fat_Content` we can cearly see that there are some inconsistencies, in fact we have 2 different names for "Regular Fat" that are "Regular" and "reg" and 3 different names for "Low Fat" that are "Low fat", "low fat", "LF".
+To solve this problem, we edited the column "Item_Fat_Content" in this way: all records that start with R or r, will be renamed "Regular Fat", and other will be renamed "Low Fat".
 Then we will print the uniques name of the column after the edit to chek if the process ended successfully 
 
-
-###Checking for Missing Values
+####Checking for Missing Values
 
 ```{r check for missing values, echo=FALSE}
 
@@ -89,13 +82,9 @@ na_empty_or_zero_counts <- sapply(df_copy, count_na_empty_or_zero_strings)
 # Stampa il numero di "NA", "" o "0" per ogni colonna della copia
 print(na_empty_or_zero_counts)
 ```
-We see that there are 3 columns with missing values:
--Item_Weight
--Item_Visibility
--Outlet_Size
+We see that there are 3 columns with missing values: `Item_Weight`, `Item_Visibility` and `Outlet_Size`. We will start to handling missing values from `Outlet_Size`
 
-
-```{r Outlet size analysis, echo=FALSE}
+```{r Outlet size analysis, include=FALSE}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
@@ -111,8 +100,6 @@ percentuale_stringhe_vuote <- (null / total) * 100
 
 print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
 ```
-
-
 
 ```{r updating outlet_size, include=FALSE}
 # Aggiornamento della colonna 'Outlet_Size'
@@ -135,25 +122,22 @@ print(outlet_summary)
 
 ```
 
-```{r Outlet_Size Analysis 2, echo=FALSE}
+```{r Outlet_Size Analysis 2, include=FALSE}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
 #numero di records
 total<- nrow(df)
 
-print(paste("Number of rows with missing valuess on Outlet_Size:",null))
+print(paste("Number of rows with missing values on `Outlet_Size now`:",null))
 
 #percentuale di righe senza outlet_size
 percentuale_stringhe_vuote <- (null / total) * 100
 
 #stampa percentuale di righe senza outlet_size
 
-print(paste("Percentuale di records con stringhe vuote in 'Outlet_Size':", percentuale_stringhe_vuote, "%"))
+print(paste("Percentage of missing values on `Outlet_Size` now:", percentuale_stringhe_vuote, "%"))
 ```
-
-
-
 
 ```{r adding na values, include=FALSE}
 # Aggiornamento della colonna 'Outlet_Size' per riempire le stringhe vuote
@@ -171,8 +155,6 @@ For "Supermarket Type2" and "Supermarket Type3", missing sizes were filled with 
 These imputations reduced the percentage of missing values from 28% to 21%, decreasing the total number of missing entries from 2410 to 1855.
 
 Regarding "Supermarket Type1" we do not have enough informations or clear patterns, so we had to fill the remaining missing entries with a placeholder value of "NA", ensuring no data point within "Outlet_Size" remained unaddressed.
-
-
 
 ```{r factor converting, include=FALSE}
 
@@ -193,16 +175,13 @@ df <- df%>%
   ))
 head(df)
 ```
-We converted as factor the columns `Item_Fat_Content` and we also want to convert the column `Outlet_Size` giving respectively:
+Before proceeding with hndling missing values for the other features, we converted as factor the columns `Item_Fat_Content` and `Outlet_Size` giving respectively:
 0 -> "Low Fat" 
 1 -> "Regular"
 
 1 -> Small
 2 -> Medium
 3 -> Large
-
-
-
 
 ```{r handling missing item_weight, include=FALSE}
 
@@ -228,16 +207,10 @@ head(df)
 
 
 ```
-Here we handled missing values for `Item_Weight`. 
-The first idea was to use the general mean of `Item_Weight`, but since we have also the category of each product, we can compute the mean of every product category.
-At the end, we checked for every record with missing `Item_Weight` and we will do a double check:
-1. If there were another item with the same id and missing weight, they will have for sure the same weight.
-2. We will put in item_weight, the mean of the weights of the products of the same category.
+To handle missing values for `Item_Weight` our first idea was to use the general mean of `Item_Weight`, but since we have also the category of each product, we can compute the mean of every product category, so we checked for every record with missing `Item_Weight` and we double checked:
+If there were another item with the same ID and missing weight, they will have for sure the same weight, so we substituted  in `Item_Weight`, the mean of the weights of the products of the same category.
 
-
-
-# Handling with item visibility
-##checking for outliers before removing 0
+#### Handling with item visibility
 
 ```{r visibility plot, include=False}
 
@@ -250,12 +223,8 @@ p4 <- ggplot(df, aes(x = "", y = Item_Visibility)) +
 print(p4)
 ```
 
+####scrivere il codice per rimuovere gli outliers
 since there are few outliers in the item visibility, we have decided to remove them.
-
-#scrivere il codice per rimuovere gli outliers
-
-
-
 
 ```{r count 0 values in item visibility, include=FALSE}
 # Find the number of zero 'Item_Visibility' values for each 'Outlet_Identifier'
@@ -303,6 +272,16 @@ df <- df[, !names(df) %in% c("Item_Visibility.new", "key")]
 df <- df %>%
   select(-Item_Type.new, -Outlet_Size.new)
 ```
+
+```{r count Visibility for each store, include=FALSE}
+
+visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
+names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
+
+# Display the result
+print(visibility_sum_per_store)
+```
+
 Finally we fixed the missing values for `Item_Visibility`. To do it we firstly count the number of missing values for each of the 10 shops and their visibility to understand how much visibility we are missing from each store. Our first idea was to subtract each visibility percentage from 100% and then equally divide the remaining visibility among the number of missing visibility product. In doing that we obtained biased and not consistent data because:
 
 1. The filled visibility in each product was too high compared to the non-zeros values
@@ -311,10 +290,6 @@ Finally we fixed the missing values for `Item_Visibility`. To do it we firstly c
 For this reason we decided to change our strategy and to fill the missing values we firstly find the missing `Item_Visibility`, then through the `Item_ID` we find all the shops that have for that product a real value, then we check the `Outlet_Size` of each shop and compare to the one of the market with missing value if it's the same we compute the mean throu all the visibility that match these criteria.
 
 We did this because for example if the missing visibility is in a Medium shop, we cannot consider the same product visibility in a Small shop, because it's obviously higher, so we take into accounts a visibility to compute the mean only if the `Outlet_Size` is the same.
-
-
-
-#category reduction of Item_Type
 
 ```{r unique categories of "Item_Type", echo=FALSE}
 #finding out all the uniques
@@ -349,34 +324,9 @@ df <- df %>%
 df <- df %>%
   rename(Item_Type = Item_Type_Reduced)
 ```
-we have converted item_type_category into:
-Food basics 
-Processed Foods
-Beverages
-Non-Food Items
-Produce
-Others
+To ensure more product type-based results rather than product-specific ones, we have categorized item_type_category into the following groups: Food Basics, Processed Foods, Beverages, Non-Food Items, Produce, and Others.
 
-Per avere risultati più basati sul tipo di prodotto e non sul prodotto in se
-
-
-
-
-
-
-```{r count Visibility for each store, include=FALSE}
-
-visibility_sum_per_store <- aggregate(Item_Visibility ~ Outlet_Identifier, data = df, sum)
-names(visibility_sum_per_store)[2] <- "Total_Item_Visibility"
-
-# Display the result
-print(visibility_sum_per_store)
-```
-
-
-##Multivariate Analysis
-
-Now we will start to find out some correlations between variables.
+### Multivariate Analysis
 
 ```{R corr matrix, echo=FALSE}
 
@@ -394,51 +344,97 @@ corrplot(cor_matrix, method = "circle", type = "upper", order = "hclust",
 
 ```
 
+After we generated the Correlation Matrix, we can see that the main positive correlation with our target variable `Item_Outlet_Sales` are with
+`Outlet_Size` and `Item_MRP`. It seems that the bigger the outlet, the higher the sales and an higher MRP lead to an increase in sales of that product.
+From the matrix we can also see that `Item_Visibility` has a small negative correlation with `Item_Outlet_Sales` and `Outlet_Size`, suggesting that `Item_Visibility` doesn not impact sales, but we investigate this further later.
 
+####Investigation of Correlated Features
 
-We can see that there are big positive relation between:
-
-Outlet_Size and Item_Outlet_Sales, it seems that the bigger the outlet, the higher the sales
-
-Item_MRP and Item_Outlet_Sales, an higher mrp lead to an increase in sales of that product
-
-Small negative correlation betwen item_visibility and outlet_size 
-
-Small negative correlation between item_visibility and item_outlet_sales
-
-#Item MRP and Outlet Sales
-
-as stated in the corr matrix wecan see that the higher the MRP, the higher the outlet sales.
-In the following plot we can focus on the "blank zones" in which there are not sales.
-We have findout that there 
-
-```{r item MRP vs Outlet sales with gaps of price, echo=FALSE }
-# Load necessary libraries
-library(ggplot2)
-
-# Specific price points to add to the plot
+```{r Plot most correlated features distributions, echo=FALSE, warning=FALSE}
+# Specific price points to add to the plot for Item MRP vs Outlet Sales
 specific_price_points <- c(67.99, 134.49, 199.99)
 
-# Plot the relationship between Item_MRP and Item_Outlet_Sales
-p <- ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
+# Plot the relationship between Item MRP and Item Outlet Sales
+p1 <- ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales)) +
   geom_point(alpha = 0.5) +
-  labs(title = "Relationship between Item MRP and Outlet Sales",
+  labs(title = "Outlet Sales per Item MRP",
        x = "Item MRP", y = "Outlet Sales")
 
 # Add vertical lines for specific price points
 for (price in specific_price_points) {
-  p <- p + geom_vline(xintercept = price, linetype = "dotted", color = "blue", alpha = 0.7)
-  p <- p + annotate("text", x = price, y = max(df$Item_Outlet_Sales) * 0.9, label = price, color = "blue", angle = 90, vjust = -0.5, size = 3)
+  p1 <- p1 + geom_vline(xintercept = price, linetype = "dotted", color = "blue", alpha = 0.7)
+  p1 <- p1 + annotate("text", x = price, y = max(df$Item_Outlet_Sales) * 0.9, label = price, color = "blue", angle = 90, vjust = -0.5, size = 3)
 }
 
-# Print the plot
-print(p)
+# Convert selected categorical variables to factor if not already
+df$Outlet_Size <- as.factor(df$Outlet_Size)
 
+# Continuous Variables - Only consider Item Visibility for this demonstration
+continuous_vars <- c("Item_Visibility")
+
+# Categorical Variables - Only consider Outlet Size for this demonstration
+categorical_vars <- c("Outlet_Size")
+
+# Plotting Distribution of Sales for Continuous Variables
+p2 <- ggplot(df, aes_string(x = continuous_vars, y = "Item_Outlet_Sales")) +
+    geom_point(alpha = 0.5) +
+    geom_smooth(method = "lm", color = "blue") +
+    labs(title = paste( "Outlet Sales per", continuous_vars),
+         x = continuous_vars, y = "Outlet Sales") +
+    theme_minimal()
+
+# Plotting Distribution of Sales for Categorical Variables
+p3 <- df %>%
+    group_by_(.dots = categorical_vars) %>%
+    summarise(Average_Sales = mean(Item_Outlet_Sales)) %>%
+    ggplot(aes_string(x = categorical_vars, y = "Average_Sales", fill = categorical_vars)) +
+    geom_bar(stat = "identity", color = "black") +
+    labs(title = paste("Average Sales by", categorical_vars),
+         x = categorical_vars, y = "Average Sales") +
+    theme_minimal()
+
+# Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
+df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
+df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
+
+# Convert categorical variables to factors
+df$Item_Type <- as.factor(df$Item_Type)
+df$Outlet_Type <- as.factor(df$Outlet_Type)
+
+# Segmented Regression by Item Type
+item_type_models <- df %>%
+  group_by(Item_Type) %>%
+  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
+
+# Creating scatter plots segmented by Outlet_Type
+p4 <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  facet_wrap(~ Outlet_Type) +
+  labs(title = "Outlet Sales for Visibility & O.Type",
+       x = "Item Visibility", y = "Outlet Sales") +
+  theme_minimal()
+
+# Arrange all plots in a grid
+grid.arrange(p1, p2, p3, p4, ncol = 2)
 ```
+Thanks this plots we can interpret some results we obtained:
+1st Plot:
+Here we have `Item_Outlet_Sales` per `Item_MRP` and it confirm what we already saw with the correlation matrix that as the MRP grows the number of sales become higher. But in this graph we can also see a curious fact: we have price gaps. In fact we calculated at which price the MRP "jumps" and we discover that it does so at all the prices at which usually shops sell their products (.99, .46 ecc...). In fact we know that a markering strategy is to sell products not for example at \$200 but at \$199.99
+
+2nd Plot: 
+Here we have `Item_Outlet_Sales` per `Item_Visibility`and even from the graph that the trend is the same of the correlation matrix (slightly negative), suggesting that items with greater visibility do not necessarily correlate with higher sales. This could seem strange as marketing logic would suggest that higher visibility should lead to higher sales. However, we found a few potential explanations for this:
+1. Very high visibility might lead to saturation where the product becomes so commonplace that it loses its appeal.
+2. If visibility metrics are high due to poor placement (like being at the end of an aisle or near the checkout where customers might ignore them), it might not convert into sales.
+3. Some products might inherently require less visibility due to strong brand loyalty or necessity.
+
+3rd Plot:
+The bar chart illustrating average sales by outlet size reveals that medium-sized outlets have more sales than large outlets. This could be attributed to several factors. Firstly, medium-sized outlets might be situated in more accessible locations, enhancing their visibility and customer reach. Additionally, they might manage their inventory and space more efficiently, creating a more pleasant shopping environment that avoids the overwhelming scale of larger stores. We also have to consider that we have a lot of NA data from the size that can change the final result. But in conclusion we didn’t have lots of surprise as the grocery stores have the smallest number of sales as predicted
+
+4th Plot:
+Here our goal was to investigate more on the `Item_Visibility` so we calculated the `Item_Outlet_Sales` per `Item_Visibility` by `Outlet_Type` to see if maybe there was one or more supermarket types responsible for the negative correlation. After the results we clearly see that for each type the result does not change, especially for grocery store where maybe people already knows what they need to buy and so the visibility doesn't affect at all their choices
+
 ```{R Relationship between Item MRP and Outlet Sales by Product Type}
-
-library(dplyr)
-
 df_summary <- df %>%
   group_by(Item_Type, MRP_Bracket = cut(Item_MRP, breaks = seq(0, max(Item_MRP), by = 20))) %>%
   summarize(Average_Sales = mean(Item_Outlet_Sales), .groups = 'drop')
@@ -450,9 +446,8 @@ ggplot(data = df_summary, aes(x = MRP_Bracket, y = Average_Sales, fill = Item_Ty
        y = "Average Outlet Sales") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
-
-zi qua c'è scritto che più vendi e più alzi il prezzo di base
-
+Here in this plot we investigate more the fact that as the MRP increases also the `Item_Outlet_Sales` does. Here we also divide the bars for each product categoryto see if there are some difference, but there aren’t any surprises.
+This relationship could sound strange cause as we know as we increase prices, the number of sales should decrease. In this case this might suggest that higher MRP might be associated with premium products that bring in more sales revenue.
 
 ```{R item outlet sales by outlet size, include=FALSE}
 ggplot(df, aes(x = Outlet_Size, y = Item_Outlet_Sales)) +
@@ -480,104 +475,17 @@ ggplot(data = df, aes(x = Item_Outlet_Sales)) +
   theme_light()
 ```
 
-```{r Advanced visualization Visibility-Sales, echo=FALSE, message=FALSE}
-# Load necessary libraries
-library(dplyr)
-library(ggplot2)
-
-# Ensure 'Item_Visibility' and 'Outlet_Sales' are treated correctly
-df$Item_Visibility <- as.numeric(as.character(df$Item_Visibility))
-df$Item_Outlet_Sales <- as.numeric(as.character(df$Item_Outlet_Sales))
-
-# Convert categorical variables to factors
-df$Item_Type <- as.factor(df$Item_Type)
-df$Outlet_Type <- as.factor(df$Outlet_Type)
-
-# Segmented Regression by Item Type
-item_type_models <- df %>%
-  group_by(Item_Type) %>%
-  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
-
-# Creating scatter plots segmented by Outlet_Type
-p_outlet_type <- ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", color = "red", se = FALSE) +
-  facet_wrap(~ Outlet_Type) +
-  labs(title = "Item Visibility vs Outlet Sales by Outlet Type",
-       x = "Item Visibility", y = "Outlet Sales") +
-  theme_minimal()
-
-# Print the plots
-print(p_outlet_type)
-```
-
-
-
-```{r Linear model to investigate on Item Visibility and Sales, include=False}
+```{r Linear model to investigate on Item Visibility and Sales, include=FALSE}
 # Fit a linear model
 model <- lm(Item_Outlet_Sales ~ Item_Visibility + Item_Type + Outlet_Type + Item_Fat_Content + Item_MRP, data = df)
 
 # Summary of the model to understand influences
 summary(model)
 ```
-
-scriviamo a mano cosa abbiamo fatto e l'output
-
-
-
-```{r Distribution of Variables across Item Sales, echo=false}
-# Load necessary libraries
-library(ggplot2)
-library(dplyr)
-
-# Convert categorical variables to factor if not already
-df$Item_Type <- as.factor(df$Item_Type)
-df$Outlet_Type <- as.factor(df$Outlet_Type)
-df$Item_Fat_Content <- as.factor(df$Item_Fat_Content)
-df$Outlet_Size <- as.factor(df$Outlet_Size)
-df$Outlet_Location_Type <- as.factor(df$Outlet_Location_Type)
-
-# Continuous Variables
-continuous_vars <- c("Item_Weight", "Item_Visibility", "Item_MRP")
-
-# Categorical Variables
-categorical_vars <- c("Item_Type", "Outlet_Type", "Item_Fat_Content", "Outlet_Size", "Outlet_Location_Type")
-
-# Plotting Distribution of Sales for Continuous Variables
-for(var in continuous_vars) {
-  p <- ggplot(df, aes_string(x = var, y = "Item_Outlet_Sales")) +
-    geom_point(alpha = 0.5) +
-    geom_smooth(method = "lm", color = "blue") +
-    labs(title = paste("Scatter Plot of", var, "vs Outlet Sales"),
-         x = var, y = "Outlet Sales") +
-    theme_minimal()
-  print(p)
-}
-
-# Plotting Distribution of Sales for Categorical Variables
-for(var in categorical_vars) {
-  p <- df %>%
-    group_by_(.dots = var) %>%
-    summarise(Average_Sales = mean(Item_Outlet_Sales)) %>%
-    ggplot(aes_string(x = var, y = "Average_Sales", fill = var)) +
-    geom_bar(stat = "identity", color = "black") +
-    labs(title = paste("Average Sales by", var),
-         x = var, y = "Average Sales") +
-    theme_minimal()
-  print(p)
-}
-
-```
-
-#metti in grid i grafici ti average sales by oytlet_sizes, scatterplot di item visibility vs outlet sales ed i due di prima.
-
-
+To further investigate which factors affecting the sales of items across various outlets we developed a linear model. The results suggest significant influences from the type of outlet and the `Item_MRP`, confirming what we previously analyzed. As we also found before, `Item_Visibility` and most `Item_Type` categories did not show a significant impact on sales, indicating these factors are not crucial in determining sales volumes. 
+The F-statistic of 455.5 on 24 and 8498 degrees of freedom, along with a p-value of less than 2.2e-16, suggests that the model is statistically significant, suggesting that the model, while not perfect, captures a significant portion of the variation in sales across different outlets. This was not a predictive model, but was useful for us to confirm our analysis
 
 ```{R item visibility vs item mrp scatterplot, include=FALSE}
-# Load ggplot2
-library(ggplot2)
-
-
 # Create a scatter plot
 ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
   geom_point(alpha = 0.5) +  # Use semi-transparent points to handle overplotting
@@ -586,11 +494,6 @@ ggplot(df, aes(x = Item_MRP, y = Item_Visibility)) +
        title = "Relationship between Item MRP and Item Visibility") +
   theme_minimal()  # Clean minimalistic theme
 ```
-
-
-
-
-
 
 ```{R item visibility vs item mrp line graph, include=FALSE}
 # Create bins for Item MRP using a reasonable interval
@@ -608,48 +511,9 @@ ggplot(average_visibility_per_mrp, aes(x = MRP_Bin, y = Item_Visibility, group=1
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Improve x-axis label readability
 ```
-scriviamo che gli item con la visibilità più alta sono quelli con l ' mrp più basso
+Finally we investigate the relationship between `Item_Visibility` and `Item_MRP` to see if there was something that influence the visibility and we saw that the products with higher visibility are the ones with lowest MRP (the products that were not sold easily) and the ones with higher MRP (the products that could give more profit to the outlet). Here we have the final explanation of why the `Item_Visibility` is not affecting the number of sales as if a product has not done a considerable number of sales supermarkets tend to giv it more visibility to try to sell it more, but probably the problem is the product and how is it perceived from customers.
 
-gli item che fanno vedere di può sono quelli che vendono a di meno quindi quelli di cui vogliono sbarazzarsi.
-
-```{r Segmented Analysis Regression, include=FALSE}
-# Load necessary libraries
-library(ggplot2)
-library(dplyr)
-
-
-
-
-# Segmented Regression by Outlet Type
-outlet_type_models <- df %>%
-  group_by(Outlet_Type) %>%
-  do(model = lm(Item_Outlet_Sales ~ Item_Visibility, data = .))
-
-# Viewing summaries for each Outlet Type
-outlet_type_summaries <- lapply(outlet_type_models$model, summary)
-
-# Print the summaries for review
-print(outlet_type_summaries)
-
-# Optional: Plotting the regression lines for each type on a scatter plot
-# Plotting for Item Type
-ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Item_Type)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~ Item_Type) +
-  labs(title = "Item Visibility vs Outlet Sales by Item Type", x = "Item Visibility", y = "Outlet Sales")
-
-# Plotting for Outlet Type
-ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales, color = Outlet_Type)) +
-  geom_point(alpha = 0.5) +
-  geom_smooth(method = "lm", se = FALSE) +
-  facet_wrap(~ Outlet_Type) +
-  labs(title = "Item Visibility vs Outlet Sales by Outlet Type", x = "Item Visibility", y = "Outlet Sales")
-```
-
-Nei grocery store l'item visibility non influisce sul numero di vendite perchè gia sai cosa vai a prendere
-
-###Checking for Outliers
+####Checking for Outliers
 
 ```{r plots to see outliers, include=FALSE}
 # Load necessary libraries
@@ -719,7 +583,7 @@ print(p7)
 print(p8)
 
 ```
-abbiamo controllato che non ci sono outliers ma solo qualche valore alto in item sales e item visibility che però potrebbero essere veri
+We verified the presence of outliers and observed some high values in item sales and item visibility. However, we concluded that these values are plausible and decided against removing them, as they likely represent genuine variations within our data.
 
 
 ```{r Item type vs Item_Sales, include=FALSE}
@@ -739,15 +603,8 @@ ggplot(avg_sales_by_type, aes(x = Item_Type, y = Average_Sales, fill = Item_Type
   scale_fill_brewer(palette = "Paired")  # Optional: Use a color palette that is visually appealing
 
 ```
-There are not effective evidences of difference in item_sales based on item_type
-
-
-
-
-
-
-# Lower Dimensional Models
-```{r Impact of item MRP ad Outlet Type on Sales 2, include=FALSE }
+#### Lower Dimensional Models
+```{r Impact of item MRP ad Outlet Type on Sales 2, include=FALSE}
 model_mrp_outlet <- lm(Item_Outlet_Sales ~ Item_MRP * Outlet_Type, data = df)
 summary(model_mrp_outlet)
 
@@ -758,53 +615,7 @@ ggplot(df, aes(x = Item_MRP, y = Item_Outlet_Sales, color = Outlet_Type)) +
   facet_wrap(~Outlet_Type) +
   labs(title = "Impact of MRP and Outlet Type on Sales")
 ```
-
-
-
-
-## Visualization Interpretation
-
-The scatter plots across different outlet types (Grocery Store, Supermarket Type1, Type2, and Type3) show how Item_MRP influences sales:
-
-Grocery Store: The sales seem mostly flat regardless of the MRP, suggesting that price changes do not significantly influence sales in grocery stores. This could indicate price sensitivity or a limited range of products where price does not play a major role.
-
-Supermarket Type1: There appears to be a moderate positive relationship between MRP and sales. This indicates that as the price of an item increases, sales also tend to increase, possibly due to a perception of higher quality or the availability of a wider range of products.
-
-Supermarket Type2: Similar to Type1, but the relationship looks slightly weaker. This might be due to different customer demographics or store locations.
-
-Supermarket Type3: Shows a strong positive relationship between MRP and sales, suggesting that customers at Type3 supermarkets are less price-sensitive and possibly more driven by product quality or brand.
-
-Model Summary Interpretation
-The regression output provides the following insights:
-
-Intercept: The intercept is not meaningful on its own without context as it represents sales when MRP is zero and not belonging to any specific outlet type, which is not a practical scenario.
-
-
-
-
-
-```{r Impact of item MRP ad Outlet Type on Sales, include=FALSE }
-# Adjusting the model to focus only on Item Visibility
-model_visibility <- lm(Item_Outlet_Sales ~ Item_Visibility, data = df)
-summary(model_visibility)
-# Plotting the relationship between Item Visibility and Sales
-ggplot(df, aes(x = Item_Visibility, y = Item_Outlet_Sales)) +
-  geom_point(alpha = 0.3) +  # Point opacity reduced for better visualization of density
-  geom_smooth(method = "lm", se = FALSE) +  # Linear model smoothing without confidence intervals
-  labs(title = "Impact of Item Visibility on Sales",  # Updated title
-       x = "Item Visibility",  # X-axis label
-       y = "Sales")  # Y-axis label
-
-```
-
-Dobbiamo scriveree interprertazione di questo grafico
-
-
-
-
-
-
-from establishmenbt year to age 
+We generated some plots across different outlet types (Grocery Store, Supermarket Type1, Type2, and Type3) show how Item_MRP influences sales and we also found that in Grocery Store the sales seem mostly flat regardless of the MRP, suggesting that price changes do not significantly influence sales in grocery stores. This could indicate price sensitivity or a limited range of products where price does not play a major role. In Supermarket Type1 there appears to be a moderate positive relationship between MRP and sales. This indicates that as the price of an item increases, sales also tend to increase, possibly due to a perception of higher quality or the availability of a wider range of products. For Supermarket Type2 is similar to Type1, but the relationship looks slightly weaker. This might be due to different customer demographics or store locations.While for Supermarket Type3 there is a strong positive relationship between MRP and sales, suggesting that customers at Type3 supermarkets are less price-sensitive and possibly more driven by product quality or brand.
 
 ```{r calculating Outlet Age, include=FALSE}
 # Add a new column 'Outlet_Age' to the dataframe
@@ -828,10 +639,10 @@ sales_summary <- df %>%
   ungroup()
 # Merge sales summary with store ages
 sales_with_age <- merge(sales_summary, store_ages, by = "Outlet_Identifier")
-# Load the ggplot2 library
-library(ggplot2)
-
 ```
+Before proceeding with the application of the models we transformed the `Outlet_Establishment_Year` into `Outlet_Age` to be more confortable in our analysis
+
+##Model Implementation
 
 ```{R one hot econding, include=FALSE}
 # Identificazione delle variabili categoriche per l'encoding
