@@ -92,7 +92,7 @@ We see that there are 3 columns with missing values:
 -Outlet_Size
 
 
-```{r Outlet size analisy}
+```{r Outlet size analysis}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
@@ -135,7 +135,7 @@ print(outlet_summary)
 
 ```
 
-```{r Outlet size analisy 2}
+```{r Outlet_Size Analysis 2}
 #conteggio records senza Outlet_Size:
 null<-sum(nchar(df$Outlet_Size) ==0)
 
@@ -462,9 +462,6 @@ ggplot(data = df, aes(x = Item_Outlet_Sales)) +
        x = "Item Outlet Sales",
        y = "Density") +
   theme_light()
-
-#ciao2
-
 ```
 
 ```{r Advanced visualization Visibility-Sales}
